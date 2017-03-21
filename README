@@ -1,0 +1,68 @@
+ ____       _          _____ 
+/ ___|  ___| | ___  __|_   _|
+\___ \ / _ \ |/ _ \/ __|| |
+ ___) |  __/ |  __/ (__ | |
+|____/ \___|_|\___|\___||_|
+
+Created by RidgeLab Group, BYU Bioinformatics
+
+
+
+Table of Contents
+-----------------
+
+  I. Introduction
+ II. Installation Instructions
+III. Usage Instructions and Examples
+ IV. License
+  V. Funding and Acknowledgements
+ VI. Contact
+
+
+
+I. Introduction
+---------------
+SelecT is a software tool developed to ___.
+
+Please see our paper in __journal__ for further information:
+    http://sub-domain.domain.tld/some/path/to/resource
+
+
+
+II. Installation Instructions
+-----------------------------
+To install SelecT, first ensure the Java Runtime Environment (JRE) is installed
+on your machine.  Second, download the software from the git repository as
+follows:
+    git clone https://github.com/pickettbd/SelecT.git
+
+
+
+III. Usage Instructions and Examples
+-------------------------------------
+More detail on this will come soon...
+
+
+
+IV. License
+-----------
+Please see `LICENSE'.
+
+
+
+V. Funding and Acknowledgements
+-------------------------------
+Funding for the research and production of this software was provided by
+startup funds to Perry Ridge, Ph.D.
+
+
+
+VI. Contact
+-----------
+For questions, comments, concerns, feature requests, suggestions, etc., please
+contact:
+
+Pery Ridge, Ph.D. -- perry.ridge@byu.edu
+
+Note: For usage questions, please consult section `III. Usage Instructions and
+Examples' first.
