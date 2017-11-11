@@ -33,10 +33,10 @@ public class DataAccessObject {
                 Connect();
 
             Statement stmt = connection.createStatement();
-            stmt.executeUpdate(makeAlleleTableCreateStatement());
-            stmt.executeUpdate(makeSNPTableCreateStatement());
+            stmt.executeUpdate(makeAlleleTableCreateStatement() +
+                    makeSNPTableCreateStatement() +
+                    makePopulationTableCreateStatement());
             stmt.executeUpdate(makeIndividualTableCreateStatement());
-            stmt.executeUpdate(makePopulationTableCreateStatement());
             stmt.close();
         } catch (Exception e) {
             System.err.println( e.getClass().getName() + ": " + e.getMessage() );
@@ -86,7 +86,11 @@ public class DataAccessObject {
         return "CREATE TABLE IF NOT EXISTS " + ALLELES +
                 " (rsid TEXT NOT NULL," +
                 " individualid TEXT NOT NULL," +
-                " allele TEXT NOT NULL)";
+                " allele TEXT NOT NULL," +
+                " FOREIGN KEY(rsid) REFERENCES " +
+                  SNPS + "(rsid)," +
+                " FOREIGN KEY(individualid) REFERENCES " +
+                  INDIVIDUALS + "(individualid));";
     }
 
     private String makeSNPTableCreateStatement() {
@@ -94,18 +98,21 @@ public class DataAccessObject {
                 " (rsid TEXT PRIMARY KEY NOT NULL," +
                 " chr INT NOT NULL," +
                 " pos INT NOT NULL," +
-                " freq REAL NOT NULL)";
-    }
-
-    private String makeIndividualTableCreateStatement() {
-        return "CREATE TABLE IF NOT EXISTS " + INDIVIDUALS +
-                " (individualid TEXT PRIMARY KEY NOT NULL," +
-                " populationid TEXT NOT NULL)";
+                " freq REAL NOT NULL);";
     }
 
     private String makePopulationTableCreateStatement() {
         return "CREATE TABLE IF NOT EXISTS " + POPULATIONS +
                 " (populationid TEXT PRIMARY KEY NOT NULL," +
-                " description TEXT)";
+                " description TEXT);";
     }
+
+    private String makeIndividualTableCreateStatement() {
+        return "CREATE TABLE IF NOT EXISTS " + INDIVIDUALS +
+                " (individualid TEXT PRIMARY KEY NOT NULL," +
+                " populationid TEXT NOT NULL," +
+                " FOREIGN KEY(populationid) REFERENCES " +
+                POPULATIONS + "(populationid));";
+    }
+
 }

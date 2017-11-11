@@ -13,7 +13,8 @@ class InputFileReader {
         //Prepare reader
         FileReader fileReader;
 	try {
-            fileReader = new FileReader(filename);
+	        String workingDirectory = System.getProperty("user.dir") + "/DatabaseBuilder/test/";
+            fileReader = new FileReader(workingDirectory + filename);
 	} catch (FileNotFoundException e) {
             return false;
         }
