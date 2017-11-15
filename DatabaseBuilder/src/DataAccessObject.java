@@ -24,7 +24,7 @@ public class DataAccessObject {
         Class.forName("org.sqlite.JDBC");
         //Connect to database
         String currentDirectory = System.getProperty("user.dir");
-        connection = DriverManager.getConnection("jdbc:sqlite:" + currentDirectory + "/DatabaseBuilder/src/SELECT.db");
+        connection = DriverManager.getConnection("jdbc:sqlite:" + currentDirectory + "/DatabaseBuilder/src/db/SELECT.db");
         connection.setAutoCommit(false);
     }
 

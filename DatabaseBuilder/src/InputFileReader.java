@@ -63,7 +63,7 @@ class InputFileReader {
             for (String infoPart : info) {
                 if(infoPart.startsWith("AF")) {
                     freq = infoPart.substring(3);
-                    System.out.println("freq = " + freq);
+                    //System.out.println("freq = " + freq);
                     break;
                 }
             }
