@@ -23,7 +23,8 @@ public class DataAccessObject {
         //Register driver:
         Class.forName("org.sqlite.JDBC");
         //Connect to database
-        connection = DriverManager.getConnection("jdbc:sqlite:SELECT.db");
+        String currentDirectory = System.getProperty("user.dir");
+        connection = DriverManager.getConnection("jdbc:sqlite:" + currentDirectory + "/DatabaseBuilder/src/SELECT.db");
         connection.setAutoCommit(false);
     }
 
@@ -33,10 +34,10 @@ public class DataAccessObject {
                 Connect();
 
             Statement stmt = connection.createStatement();
-            stmt.executeUpdate(makeAlleleTableCreateStatement() +
-                    makeSNPTableCreateStatement() +
-                    makePopulationTableCreateStatement());
+            stmt.executeUpdate(makeAlleleTableCreateStatement());
+            stmt.executeUpdate(makeSNPTableCreateStatement());
             stmt.executeUpdate(makeIndividualTableCreateStatement());
+            stmt.executeUpdate(makePopulationTableCreateStatement());
             stmt.close();
         } catch (Exception e) {
             System.err.println( e.getClass().getName() + ": " + e.getMessage() );
@@ -68,7 +69,7 @@ public class DataAccessObject {
 
     private String buildInsertStatement(String... args) {
         StringBuilder insert = new StringBuilder("INSERT INTO ");
-        insert.append(args[0]); 
+        insert.append(args[0]);
         /*switch(args[0]){
             case ALLELES: insert.append(alleleColumns()); break;
             case POPULATIONS: insert.append(populationColumns()); break;
@@ -87,10 +88,7 @@ public class DataAccessObject {
                 " (rsid TEXT NOT NULL," +
                 " individualid TEXT NOT NULL," +
                 " allele TEXT NOT NULL," +
-                " FOREIGN KEY(rsid) REFERENCES " +
-                  SNPS + "(rsid)," +
-                " FOREIGN KEY(individualid) REFERENCES " +
-                  INDIVIDUALS + "(individualid));";
+                " FOREIGN KEY(rsid) REFERENCES " + SNPS + "(rsid));";
     }
 
     private String makeSNPTableCreateStatement() {
@@ -98,21 +96,19 @@ public class DataAccessObject {
                 " (rsid TEXT PRIMARY KEY NOT NULL," +
                 " chr INT NOT NULL," +
                 " pos INT NOT NULL," +
-                " freq REAL NOT NULL);";
-    }
-
-    private String makePopulationTableCreateStatement() {
-        return "CREATE TABLE IF NOT EXISTS " + POPULATIONS +
-                " (populationid TEXT PRIMARY KEY NOT NULL," +
-                " description TEXT);";
+                " freq REAL NOT NULL)";
     }
 
     private String makeIndividualTableCreateStatement() {
         return "CREATE TABLE IF NOT EXISTS " + INDIVIDUALS +
                 " (individualid TEXT PRIMARY KEY NOT NULL," +
                 " populationid TEXT NOT NULL," +
-                " FOREIGN KEY(populationid) REFERENCES " +
-                POPULATIONS + "(populationid));";
+                " FOREIGN KEY(populationid) REFERENCES " + POPULATIONS + "(populationid))";
     }
 
+    private String makePopulationTableCreateStatement() {
+        return "CREATE TABLE IF NOT EXISTS " + POPULATIONS +
+                " (populationid TEXT PRIMARY KEY NOT NULL," +
+                " description TEXT)";
+    }
 }
