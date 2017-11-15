@@ -7,7 +7,7 @@ class InputTask {
         this.filename = filename;
         this.populationID = populationID;
         this.description = description;
-    };
+    }
 
     public String getFilename() {
         return filename;

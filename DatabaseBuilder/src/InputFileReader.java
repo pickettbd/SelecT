@@ -50,7 +50,10 @@ class InputFileReader {
              [5] = QUAL quality score for assertion in ALT
              [6] = FILTER gives a PASS if the position passed all filters
              [7] = INFO additional information, coded in <key>=<data>[,data] format.
+             [8] = FORMAT if present, indicates genotype data
              [9- ] = individual alleles
+
+             source: http://www.internationalgenome.org/wiki/Analysis/Variant%20Call%20Format/vcf-variant-call-format-version-40/
             */
             // Insert SNP information into SNP table
             String chrom = parts[0];
@@ -58,7 +61,7 @@ class InputFileReader {
             String id = parts[2];
             String[] info = parts[7].split(";");
 
-            // Grab frequency of mutated gene from INFO column
+            // Get frequency of mutated gene from INFO column
             String freq = "";
             for (String infoPart : info) {
                 if(infoPart.startsWith("AF")) {
