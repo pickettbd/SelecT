@@ -75,8 +75,8 @@ class InputFileReader {
             //Iterate through individuals and store each of their alleles into allele table
             for(int i = 9; i < parts.length; i++){
                 String[] alleles = parts[i].split("|");
-                dao.insert(dao.ALLELES, id, individualIDs.get(i-9)+"-0", alleles[0]);
-                dao.insert(dao.ALLELES, id, individualIDs.get(i-9)+"-1", alleles[2]);
+                dao.insert(dao.ALLELES, id, individualIDs.get(i-9), "0", alleles[0]);
+                dao.insert(dao.ALLELES, id, individualIDs.get(i-9), "1", alleles[2]);
             }
         }
         return true;

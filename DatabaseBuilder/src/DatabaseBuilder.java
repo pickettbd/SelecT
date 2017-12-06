@@ -2,25 +2,23 @@ import java.io.*;
 
 class DatabaseBuilder {
     private static InputFileReader inputReader;
-    private static DataAccessObject dataAccess;
-    private static UserInterface ui;
+    private static String FILENOTFOUND_ERROR = "Error: File not found.";
 
-    public static void main(String[] args){
+    public static void createDatabase(InputTask task){
         DataAccessObject dataAccess = new DataAccessObject();
         inputReader = new InputFileReader(dataAccess);
-        ui = new UserInterface();
-        InputTask task;
-        while (true) {
-            try {
-                task = ui.taskPrompt();
-                if (task == null)
-                    break;
-                if(!inputReader.readFile(task.getFilename(), task.getPopulationID(), task.getDescription()))
-                    ui.fileNotFound();
-		dataAccess.commit();
-            } catch (IOException e) {
-                break;
-            }
-        } 
+        try {
+            if (task == null)
+                return;
+            if(!inputReader.readFile(task.getFilename(), task.getPopulationID(), task.getDescription()))
+                fileNotFound();
+		    dataAccess.commit();
+		    System.out.println("File successfully imported!\n");
+        } catch (IOException e) {
+        }
+    }
+
+    public static void fileNotFound() {
+        System.out.println(FILENOTFOUND_ERROR);
     }
 }

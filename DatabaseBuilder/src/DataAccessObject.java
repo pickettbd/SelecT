@@ -1,11 +1,16 @@
 import java.sql.*;
 import java.lang.StringBuilder;
+import java.util.ArrayList;
 
 public class DataAccessObject {
-    public final static String ALLELES = "alleles";
     public final static String SNPS = "snps";
-    public final static String INDIVIDUALS = "individuals";
+    public final static String[] SNPS_COLUMNS = {"rsid", "chr", "pos", "freq"};
+    public final static String ALLELES = "alleles";
+    public final static String[] ALLELES_COLUMNS = {SNPS_COLUMNS[0], "individualid", "allele_number", "allele"};
     public final static String POPULATIONS = "populations";
+    public static final String[] POPULATIONS_COLUMNS = {"populationid", "description"};
+    public final static String INDIVIDUALS = "individuals";
+    public final static String[] INDIVIDUALS_COLUMNS = {"individualid", POPULATIONS_COLUMNS[0]};
 
     private Connection connection;
 
@@ -68,6 +73,31 @@ public class DataAccessObject {
         }
     }
 
+    // Modify this so that it only gets results within a given window and returns something more useful than a ResultSet
+    public ResultSet getSurroundingPositives(String rsid) {
+        String getStatement = String.format("SELECT * FROM %1$s " +
+                "WHERE %2$s = 1;",
+                ALLELES,
+                ALLELES_COLUMNS[2]);
+        try {
+            Statement statement = connection.createStatement();
+            ResultSet rs = statement.executeQuery(getStatement);
+            return rs;
+        } catch (SQLException e) {
+
+        }
+        return null;
+    }
+
+    public ArrayList<SNP> getSNPs() {
+        ArrayList<SNP> snps = new ArrayList<>();
+
+        String statement = String.format("SELECT * FROM %1$s;",
+                SNPS);
+
+        return snps;
+    }
+
     private String buildInsertStatement(String... args) {
         StringBuilder insert = new StringBuilder("INSERT INTO ");
         insert.append(args[0]);
@@ -85,31 +115,34 @@ public class DataAccessObject {
     }
 
     private String makeAlleleTableCreateStatement() {
-        return "CREATE TABLE IF NOT EXISTS " + ALLELES +
-                " (rsid TEXT NOT NULL," +
-                " individualid TEXT NOT NULL," +
-                " allele TEXT NOT NULL," +
-                " FOREIGN KEY(rsid) REFERENCES " + SNPS + "(rsid));";
+        return "CREATE TABLE IF NOT EXISTS " + ALLELES + " (" +
+                ALLELES_COLUMNS[0] + " TEXT NOT NULL, " +
+                ALLELES_COLUMNS[1] + " TEXT NOT NULL, " +
+                ALLELES_COLUMNS[2] + " INTEGER NOT NULL, " +
+                ALLELES_COLUMNS[3] + " INTEGER NOT NULL, " +
+                " FOREIGN KEY(" + ALLELES_COLUMNS[0] + ") REFERENCES " +
+                SNPS + "(" + SNPS_COLUMNS[0] + "));";
     }
 
     private String makeSNPTableCreateStatement() {
-        return "CREATE TABLE IF NOT EXISTS " + SNPS +
-                " (rsid TEXT PRIMARY KEY NOT NULL," +
-                " chr INT NOT NULL," +
-                " pos INT NOT NULL," +
-                " freq REAL NOT NULL)";
+        return "CREATE TABLE IF NOT EXISTS " + SNPS + " (" +
+                SNPS_COLUMNS[0] + " TEXT PRIMARY KEY NOT NULL, " +
+                SNPS_COLUMNS[1] + " INT NOT NULL, " +
+                SNPS_COLUMNS[2] + " INT NOT NULL, " +
+                SNPS_COLUMNS[3] + " REAL NOT NULL);";
     }
 
     private String makeIndividualTableCreateStatement() {
-        return "CREATE TABLE IF NOT EXISTS " + INDIVIDUALS +
-                " (individualid TEXT PRIMARY KEY NOT NULL," +
-                " populationid TEXT NOT NULL," +
-                " FOREIGN KEY(populationid) REFERENCES " + POPULATIONS + "(populationid))";
+        return "CREATE TABLE IF NOT EXISTS " + INDIVIDUALS + " (" +
+                INDIVIDUALS_COLUMNS[0] + " TEXT PRIMARY KEY NOT NULL, " +
+                INDIVIDUALS_COLUMNS[1] + " TEXT NOT NULL, " +
+                " FOREIGN KEY(" + INDIVIDUALS_COLUMNS[1] + ") REFERENCES " +
+                POPULATIONS + "(" + POPULATIONS_COLUMNS[0] + "));";
     }
 
     private String makePopulationTableCreateStatement() {
-        return "CREATE TABLE IF NOT EXISTS " + POPULATIONS +
-                " (populationid TEXT PRIMARY KEY NOT NULL," +
-                " description TEXT)";
+        return "CREATE TABLE IF NOT EXISTS " + POPULATIONS + " (" +
+                POPULATIONS_COLUMNS[0] + " TEXT PRIMARY KEY NOT NULL, " +
+                POPULATIONS_COLUMNS[1] + " TEXT);";
     }
 }

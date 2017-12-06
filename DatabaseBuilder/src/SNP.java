@@ -6,6 +6,7 @@ public class SNP {
     private int chr;
     private int pos;
     private float DAF;
+    private float EHH;
     private float IHH;
     private float unstdIHS;
 
@@ -56,4 +57,9 @@ public class SNP {
     public void setUnstdIHS(float unstdIHS) {
         this.unstdIHS = unstdIHS;
     }
+
+    public void calculateEHH() {
+
+    }
+
 }
