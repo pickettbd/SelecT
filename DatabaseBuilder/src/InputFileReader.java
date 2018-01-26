@@ -26,8 +26,17 @@ class InputFileReader {
         //Insert the population ID and description to its table
         dao.insert(dao.POPULATIONS, popid, popDescription);
 
+
+        String targetPopulation = "";
+        String crossPopulation = "";
+
+        if (popDescription.equals("human")) {
+          targetPopulation = UserInterface.getTargetPopulation();
+          crossPopulation = UserInterface.getCrossPopulation();
+        }
+
         //Read in lines of .vcf files.
-        while((line = buffReader.readLine()) != null){
+        while ((line = buffReader.readLine()) != null){
             if(line.charAt(0) == '#') {
                 //Ignore ## header lines. Single # line contains column headings
                 if(line.charAt(1) != '#'){
@@ -73,20 +82,18 @@ class InputFileReader {
 
             //This handles insertion for a typical species' vcf file (the end goal for the program)
             //We need to have two different tables, one for each file, not just SNPS
-            if (popDescription == "target") {
-              dao.insert(dao.SNPS, id, chrom, pos, freq);
+            if (popDescription.equals("target")) {
+              dao.insert(dao.TARGETSNPS, id, chrom, pos, freq);
 
             }
 
-            if (popDescription == "cross") {
-              dao.insert(dao.SNPS, id, chrom, pos, freq);
+            if (popDescription.equals("cross")) {
+              dao.insert(dao.CROSSSNPS, id, chrom, pos, freq);
 
             }
 
             //in the case of a single human file where we need two additional columns
             else {
-              String targetPopulation = UserInterface.getTargetPopulation();
-              String crossPopulation = UserInterface.getCrossPopulation();
               //Get frequency of target and cross populations from INFO column
               String target = "";
               for (String infoPart : info) {
@@ -106,7 +113,7 @@ class InputFileReader {
               }
 
               //We need to create a different table for humans that has two more rows
-              dao.insert(dao.SNPS, id, chrom, pos, freq, target, cross);
+              dao.insert(dao.HUMANSNPS, id, chrom, pos, freq, target, cross);
             }
 
             //Iterate through individuals and store each of their alleles into allele table

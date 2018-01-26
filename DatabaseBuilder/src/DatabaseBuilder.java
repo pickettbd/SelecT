@@ -9,7 +9,7 @@ class DatabaseBuilder {
         inputReader = new InputFileReader(dataAccess);
         try {
             if (task == null)
-                return;
+                return null;
             if(!inputReader.readFile(task.getFilename(), task.getPopulationID(), task.getDescription()))
                 fileNotFound();
 		    dataAccess.commit();

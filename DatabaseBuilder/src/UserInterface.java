@@ -1,6 +1,6 @@
 import java.io.*;
 
-//Note to self: compile from SelecT with java -cp ./DatabaseBuilder/src:./DatabaseBuilder/lib/ UserInterface
+//Note to self: run from SelecT with java -cp ./DatabaseBuilder/src:./DatabaseBuilder/lib/ UserInterface
 //So how do I get a connection with the database?
 class UserInterface {
     private static String FILENAME_PROMPT = "Enter file name (It should be in the 'test' folder) (leave blank if none): ";
@@ -66,7 +66,7 @@ class UserInterface {
         }
         System.out.print(POPULATIONID_PROMPT);  //why do we need this one?
         populationID = input.readLine();
-        System.out.print(POPULATIONDESC_PROMPT);  //Check for valid input: human, target, or cross
+        System.out.print(POPULATIONDESC_PROMPT);  //!!!!Check for valid input: human, target, or cross
         description = input.readLine();
         InputTask task = new InputTask(filename, populationID, description);
         dao = DatabaseBuilder.createDatabase(task);

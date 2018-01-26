@@ -44,7 +44,7 @@ public class DataAccessObject {
             stmt.executeUpdate(makeTargetSNPTableCreateStatement());
             stmt.executeUpdate(makeIndividualTableCreateStatement());
             stmt.executeUpdate(makePopulationTableCreateStatement());
-            statement.executeUpdate(makeStatsTableCreateStatement(););
+            stmt.executeUpdate(makeStatsTableCreateStatement());
             stmt.close();
         } catch (Exception e) {
             System.err.println( e.getClass().getName() + ": " + e.getMessage() );
@@ -114,7 +114,10 @@ public class DataAccessObject {
                 " (rsid TEXT NOT NULL," +
                 " individualid TEXT NOT NULL," +
                 " allele TEXT NOT NULL," +
-                " FOREIGN KEY(rsid) REFERENCES " + SNPS + "(rsid));";
+                " FOREIGN KEY(rsid) REFERENCES " + HUMANSNPS + "(rsid));";
+                //HUMANSNPS was used so that the program will compile, but we need to look
+                //at which table should actually be referenced here.  We may
+                //need two allele tables depending if we are working with humans or not
     }
 
     private String makeTargetSNPTableCreateStatement() {

@@ -7,6 +7,9 @@ public class PopulationStats {
 
     public PopulationStats(DataAccessObject dao){
       this.dao = dao;
+      //Do I actually need to pass the same DataAccessObject?
+      //If we load in multiple files, DatabaseBuilder recreates a new DataAccessObject
+      //each time, does that mean we won't have access to all of our tables?
     }
 
     public void calculateStats(int numberOfFiles){
