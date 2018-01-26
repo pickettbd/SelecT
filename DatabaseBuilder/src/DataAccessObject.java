@@ -3,10 +3,12 @@ import java.lang.StringBuilder;
 
 public class DataAccessObject {
     public final static String ALLELES = "alleles";
-    public final static String SNPS = "snps";
+    public final static String TARGETSNPS = "targetsnps";
+    public final static String CROSSSNPS = "crosssnps";
+    public final static String HUMANSNPS = "humansnps";
     public final static String INDIVIDUALS = "individuals";
     public final static String POPULATIONS = "populations";
-    public final static String STATS = "stats";
+    public final static String STATS = "stats";  //for right now, this table only holds Delta DAF
 
     private Connection connection;
 
@@ -37,9 +39,12 @@ public class DataAccessObject {
 
             Statement stmt = connection.createStatement();
             stmt.executeUpdate(makeAlleleTableCreateStatement());
-            stmt.executeUpdate(makeSNPTableCreateStatement());
+            stmt.executeUpdate(makeCrossSNPTableCreateStatement());
+            stmt.executeUpdate(makeHumanSNPTableCreateStatement());
+            stmt.executeUpdate(makeTargetSNPTableCreateStatement());
             stmt.executeUpdate(makeIndividualTableCreateStatement());
             stmt.executeUpdate(makePopulationTableCreateStatement());
+            statement.executeUpdate(makeStatsTableCreateStatement(););
             stmt.close();
         } catch (Exception e) {
             System.err.println( e.getClass().getName() + ": " + e.getMessage() );
@@ -70,10 +75,7 @@ public class DataAccessObject {
           if(connection == null)
               Connect();
 
-          //Create a stats table
-          insert = makeStatsTableCreateStatement();
           Statement statement = connection.createStatement();
-          statement.executeUpdate(insert);
           //Calculate Delta DAF and insert into the stats table
           insert = buildDAFInsertStatement(args);
           statement.executeUpdate(insert);
@@ -115,12 +117,30 @@ public class DataAccessObject {
                 " FOREIGN KEY(rsid) REFERENCES " + SNPS + "(rsid));";
     }
 
-    private String makeSNPTableCreateStatement() {
-        return "CREATE TABLE IF NOT EXISTS " + SNPS +
+    private String makeTargetSNPTableCreateStatement() {
+        return "CREATE TABLE IF NOT EXISTS " + TARGETSNPS +
                 " (rsid TEXT PRIMARY KEY NOT NULL," +
                 " chr INT NOT NULL," +
                 " pos INT NOT NULL," +
                 " freq REAL NOT NULL)";
+    }
+
+    private String makeCrossSNPTableCreateStatement() {
+        return "CREATE TABLE IF NOT EXISTS " + CROSSSNPS +
+                " (rsid TEXT PRIMARY KEY NOT NULL," +
+                " chr INT NOT NULL," +
+                " pos INT NOT NULL," +
+                " freq REAL NOT NULL)";
+    }
+
+    private String makeHumanSNPTableCreateStatement() {
+        return "CREATE TABLE IF NOT EXISTS " + HUMANSNPS +
+                " (rsid TEXT PRIMARY KEY NOT NULL," +
+                " chr INT NOT NULL," +
+                " pos INT NOT NULL," +
+                " freq REAL NOT NULL" +
+                " target REAL NOT NULL" +
+                " cross REAL NOT NULL)";
     }
 
     private String makeIndividualTableCreateStatement() {
@@ -136,15 +156,15 @@ public class DataAccessObject {
                 " description TEXT)";
     }
 
+    //This method needs to be tested to insure it is calculating the correct values
     private String buildDAFInsertStatement(String... args){
-      //We need to double check that the tables it is reading values from have type INT
       return "INSERT INTO " + STATS + " ((SELECT " + args[0] + " FROM " + args[1] +
               ") - ( SELECT " + args[2] + " FROM " + args[3] + "))";
     }
 
     private String makeStatsTableCreateStatement(){
       return "CREATE TABLE IF NOT EXISTS " + STATS +
-              " (daf INT NOT NULL)";
+              " (daf REAL NOT NULL)";
     }
 
 }

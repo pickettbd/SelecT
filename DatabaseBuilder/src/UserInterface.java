@@ -78,8 +78,9 @@ class UserInterface {
       stats.calculateStats(numberOfFiles);
     }
 
-    //get user information to know which column to load for human data.  Used by InputFileReader
+    //get user information to know which column to load for human data:  Used by InputFileReader
     //modify to check for valid input!  from or convert to AFR_AF, AM_AF, etc in test file
+    //maybe check in InputFileReader and have it throw the error if it couldn't find the user input
     //consider throwing the error and handling elsewhere in the program?
     protected static String getTargetPopulation(){
       while (true){
