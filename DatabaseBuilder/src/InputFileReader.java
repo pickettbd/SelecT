@@ -30,9 +30,9 @@ class InputFileReader {
         while((line = buffReader.readLine()) != null){
             if(line.charAt(0) == '#') {
                 //Ignore ## header lines. Single # line contains column headings
-                if(line.charAt(1) != '#'){   
+                if(line.charAt(1) != '#'){
                     //Break up header to get individual IDs (from position 9 until the end of line)
-                    String[] parts = line.split("\t"); 
+                    String[] parts = line.split("\t");
                     for(int i = 9; i < parts.length; i++){
                         dao.insert(dao.INDIVIDUALS, parts[i], popid);
                         individualIDs.add(parts[i]);
@@ -71,13 +71,51 @@ class InputFileReader {
                 }
             }
 
-            dao.insert(dao.SNPS, id, chrom, pos, freq);
+            //This handles insertion for a typical species' vcf file (the end goal for the program)
+            //We need to have two different tables, one for each file, not just SNPS
+            if (popDescription == "target") {
+              dao.insert(dao.SNPS, id, chrom, pos, freq);
+
+            }
+
+            if (popDescription == "cross") {
+              dao.insert(dao.SNPS, id, chrom, pos, freq);
+
+            }
+
+            //in the case of a single human file where we need two additional columns
+            else {
+              String targetPopulation = UserInterface.getTargetPopulation();
+              String crossPopulation = UserInterface.getCrossPopulation();
+              //Get frequency of target and cross populations from INFO column
+              String target = "";
+              for (String infoPart : info) {
+                  if(infoPart.startsWith(targetPopulation)) {
+                      target = infoPart.substring(3);
+                      //System.out.println("freq = " + freq);
+                      break;
+                  }
+              }
+              String cross = "";
+              for (String infoPart : info) {
+                  if(infoPart.startsWith(crossPopulation)) {
+                      cross = infoPart.substring(3);
+                      //System.out.println("freq = " + freq);
+                      break;
+                  }
+              }
+
+              //We need to create a different table for humans that has two more rows
+              dao.insert(dao.SNPS, id, chrom, pos, freq, target, cross);
+            }
+
             //Iterate through individuals and store each of their alleles into allele table
             for(int i = 9; i < parts.length; i++){
                 String[] alleles = parts[i].split("|");
                 dao.insert(dao.ALLELES, id, individualIDs.get(i-9), "0", alleles[0]);
                 dao.insert(dao.ALLELES, id, individualIDs.get(i-9), "1", alleles[2]);
             }
+
         }
         return true;
     }

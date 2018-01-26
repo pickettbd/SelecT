@@ -4,7 +4,7 @@ class DatabaseBuilder {
     private static InputFileReader inputReader;
     private static String FILENOTFOUND_ERROR = "Error: File not found.";
 
-    public static void createDatabase(InputTask task){
+    public static DataAccessObject createDatabase(InputTask task){
         DataAccessObject dataAccess = new DataAccessObject();
         inputReader = new InputFileReader(dataAccess);
         try {
@@ -16,6 +16,7 @@ class DatabaseBuilder {
 		    System.out.println("File successfully imported!\n");
         } catch (IOException e) {
         }
+        return dataAccess;
     }
 
     public static void fileNotFound() {
