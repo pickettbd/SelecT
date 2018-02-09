@@ -1,5 +1,6 @@
 import java.sql.*;
 import java.lang.StringBuilder;
+import java.io.*;
 
 public class DataAccessObject {
     public final static String ALLELES = "alleles";
@@ -20,6 +21,8 @@ public class DataAccessObject {
         } catch (Exception e) {
             System.err.println("error from DAO");
             System.err.println( e.getClass().getName() + ": " + e.getMessage() );
+
+            e.printStackTrace(System.out);
         }
     }
 
@@ -75,7 +78,8 @@ public class DataAccessObject {
 
     //Maybe we can combine this function and the ones above and below since they are similar?
     //add some keyword for which function to call for the value of insert
-    public void getDeltaDAF(String... args){
+    public ResultSet getAlleleFrequency(String... args){
+      ResultSet rs = new ResultSet();
       String insert = "";
       try {
           if(connection == null)
@@ -83,12 +87,14 @@ public class DataAccessObject {
 
           Statement statement = connection.createStatement();
           //Calculate Delta DAF and insert into the stats table
-          insert = buildDAFInsertStatement(args);
-          statement.executeUpdate(insert);
+          insert = buildAlleleFrequencyInsertStatement(args);
+          rs = statement.executeQuery(insert);
           statement.close();
+          return rs;
       } catch (Exception e){
           System.err.println( e.getClass().getName() + ": " + e.getMessage() );
           System.out.println(insert);
+          return null
       }
     }
 
@@ -136,7 +142,8 @@ public class DataAccessObject {
         return "CREATE TABLE IF NOT EXISTS " + ALLELES +
                 " (rsid TEXT NOT NULL," +
                 " individualid TEXT NOT NULL," +
-                " allele TEXT NOT NULL," +
+                " allele1 TEXT NOT NULL," +
+                " allele2 TEXT NOT NULL," +
                 " FOREIGN KEY(rsid) REFERENCES " + HUMANSNPS + "(rsid));";
                 //HUMANSNPS was used so that the program will compile, but we need to look
                 //at which table should actually be referenced here.  We may
@@ -171,6 +178,9 @@ public class DataAccessObject {
                 " target REAL NOT NULL," + //freq of target subpopulation
                 " cross REAL NOT NULL," + //freq of cross subpopulation
                 " n REAL NOT NULL)";
+                //This table only handles one human file; do we need to inclue the ID
+                //so we can potentially run multiple human files?
+                //As the program is now, it can only run one/one set of files at a time...
     }
 
     private String makeIndividualTableCreateStatement() {
@@ -194,10 +204,22 @@ public class DataAccessObject {
               " fst REAL)";
     }
 
+    private String buildAlleleFrequencyInsertStatement(String... args){
+      String SQL = "";
+      if (args.length == 2) {
+        //build SQL statement
+      }
+      if (args.length == 4) {
+        //build SQL statement
+      }
+      return SQL;
+    }
+
     //This method and the one below need to be tested to insure it is calculating the correct values
     private String buildDAFInsertStatement(String... args){
-      return "INSERT INTO " + STATS + " ((SELECT " + args[0] + " FROM " + args[1] +
-              ") - ( SELECT " + args[2] + " FROM " + args[3] + "))";
+      System.out.println("DAF insert statement built");
+      return "INSERT INTO " + STATS + " (SELECT " + args[0] + " FROM " + args[1] +
+              ") " ;//"- ( SELECT " + args[2] + " FROM " + args[3] + "))";
     }
 
     //Is this (and above) a valid way to update all rows at once?

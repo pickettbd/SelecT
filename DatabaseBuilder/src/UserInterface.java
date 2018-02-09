@@ -4,7 +4,7 @@ import java.io.*;
 //So how do I get a connection with the database?
 class UserInterface {
     private static String FILENAME_PROMPT = "Enter file name (It should be in the 'test' folder) (leave blank if none): ";
-    private static String POPULATIONID_PROMPT = "Enter population ID for data stored in the file: ";
+    private static String POPULATIONID_PROMPT = "Enter UNIQUE population ID for data stored in the file: ";
     private static String POPULATIONDESC_PROMPT = "Enter a description of this population (human, target, or cross): ";
     private static String TARGETPOPULATION_PROMPT = "Enter the name of the target population (e.g. AFR_AF): ";
     private static String CROSSPOPULATION_PROMPT = "Enter the name of the cross population (e.g. AMR_AF): ";
@@ -35,7 +35,7 @@ class UserInterface {
         while(true) {
             System.out.println("Please select from among the following options:");
             System.out.println("[1] : Import population file");
-            System.out.println("[2] : Calculate EFF");
+            System.out.println("[2] : Calculate Statistics");
             BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
             try {
                 switch (input.readLine()) {
@@ -64,7 +64,9 @@ class UserInterface {
             System.out.println("Invalid file name");
             return;
         }
-        System.out.print(POPULATIONID_PROMPT);  //why do we need this one?
+        //this creates a unique key for one of the tables... We need to verify that it is a valid key
+        //or remove it altogether.
+        System.out.print(POPULATIONID_PROMPT);
         populationID = input.readLine();
         System.out.print(POPULATIONDESC_PROMPT);  //!!!!Check for valid input: human, target, or cross
         description = input.readLine();

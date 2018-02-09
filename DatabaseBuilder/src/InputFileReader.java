@@ -74,7 +74,7 @@ class InputFileReader {
             String freq = "";
             String n = "";
             for (String infoPart : info) {
-                if(infoPart.startsWith("AF")) {
+                if(infoPart.startsWith("AF=")) {
                     freq = infoPart.substring(3);
                     //System.out.println("freq = " + freq);
                 }
@@ -102,7 +102,7 @@ class InputFileReader {
               String target = "";
               for (String infoPart : info) {
                   if(infoPart.startsWith(targetPopulation)) {
-                      target = infoPart.substring(3);
+                      target = infoPart.substring(8);
                       //System.out.println("freq = " + freq);
                       break;
                   }
@@ -110,7 +110,7 @@ class InputFileReader {
               String cross = "";
               for (String infoPart : info) {
                   if(infoPart.startsWith(crossPopulation)) {
-                      cross = infoPart.substring(3);
+                      cross = infoPart.substring(8);
                       //System.out.println("freq = " + freq);
                       break;
                   }
