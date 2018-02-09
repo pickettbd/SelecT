@@ -74,7 +74,7 @@ class UserInterface {
 
     private static void runStats() {
       //check that there are the appropriate number of files loaded....
-      PopulationStats stats = new PopulationStats(dao);
+      PopulationStats stats = new PopulationStats();
       stats.calculateStats(numberOfFiles);
     }
 

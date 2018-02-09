@@ -5,16 +5,13 @@
 public class PopulationStats {
     private DataAccessObject dao;
 
-    public PopulationStats(DataAccessObject dao){
-      this.dao = dao;
-      //Do I actually need to pass the same DataAccessObject?
-      //If we load in multiple files, DatabaseBuilder recreates a new DataAccessObject
-      //each time, does that mean we won't have access to all of our tables?
+    public PopulationStats(){
+      dao = new DataAccessObject();
     }
 
     public void calculateStats(int numberOfFiles){
       calculateDeltaDAF(numberOfFiles);
-      calculateFst();
+      calculateFst(numberOfFiles);
       //add iHH, etc
     }
 
@@ -28,8 +25,13 @@ public class PopulationStats {
       }
     }
 
-    private void calculateFst() {
-        return;
+    private void calculateFst(int numberOfFiles) {
+      if (numberOfFiles == 1) {
+        dao.getFst("target", dao.HUMANSNPS, "cross", dao.HUMANSNPS);
+      }
+      else {
+        dao.getFst("freq", dao.TARGETSNPS, "freq", dao.CROSSSNPS);
+      }
     }
 
 

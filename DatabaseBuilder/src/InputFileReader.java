@@ -70,25 +70,29 @@ class InputFileReader {
             String id = parts[2];
             String[] info = parts[7].split(";");
 
-            // Get frequency of mutated gene from INFO column
+            // Get frequency of mutated gene and total alleles (n) sequenced from INFO column
             String freq = "";
+            String n = "";
             for (String infoPart : info) {
                 if(infoPart.startsWith("AF")) {
                     freq = infoPart.substring(3);
                     //System.out.println("freq = " + freq);
-                    break;
+                }
+                else if (infoPart.startsWith("AN")) {
+                  n = infoPart.substring(3);
+                  break;
                 }
             }
 
             //This handles insertion for a typical species' vcf file (the end goal for the program)
             //We need to have two different tables, one for each file, not just SNPS
             if (popDescription.equals("target")) {
-              dao.insert(dao.TARGETSNPS, id, chrom, pos, freq);
+              dao.insert(dao.TARGETSNPS, id, chrom, pos, freq, n);
 
             }
 
             if (popDescription.equals("cross")) {
-              dao.insert(dao.CROSSSNPS, id, chrom, pos, freq);
+              dao.insert(dao.CROSSSNPS, id, chrom, pos, freq, n);
 
             }
 
@@ -113,7 +117,7 @@ class InputFileReader {
               }
 
               //We need to create a different table for humans that has two more rows
-              dao.insert(dao.HUMANSNPS, id, chrom, pos, freq, target, cross);
+              dao.insert(dao.HUMANSNPS, id, chrom, pos, freq, target, cross, n);
             }
 
             //Iterate through individuals and store each of their alleles into allele table

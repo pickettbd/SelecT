@@ -11,12 +11,14 @@ public class DataAccessObject {
     public final static String STATS = "stats";  //for right now, this table only holds Delta DAF
 
     private Connection connection;
-
+    //Somewhere in the code we need to figure out where to commit the changes that are made in each function.
+    //Also need to figure out where (and what...) to close stuff.
     public DataAccessObject() {
         try {
            Connect();
            CreateTables();
         } catch (Exception e) {
+            System.err.println("error from DAO");
             System.err.println( e.getClass().getName() + ": " + e.getMessage() );
         }
     }
@@ -28,6 +30,8 @@ public class DataAccessObject {
         //Connect to database
         String currentDirectory = System.getProperty("user.dir");
         //Determines location of database in file structure
+        System.out.println(currentDirectory);
+
         connection = DriverManager.getConnection("jdbc:sqlite:" + currentDirectory + "/DatabaseBuilder/src/db/SELECT.db");
         connection.setAutoCommit(false);
     }
@@ -47,7 +51,9 @@ public class DataAccessObject {
             stmt.executeUpdate(makeStatsTableCreateStatement());
             stmt.close();
         } catch (Exception e) {
+            System.err.println("this happened in CreateTables");
             System.err.println( e.getClass().getName() + ": " + e.getMessage() );
+            //System.err.println( e.printStackTrace());
         }
     }
 
@@ -67,7 +73,7 @@ public class DataAccessObject {
         }
     }
 
-    //Maybe we can combine this function and the one above since they are similar?
+    //Maybe we can combine this function and the ones above and below since they are similar?
     //add some keyword for which function to call for the value of insert
     public void getDeltaDAF(String... args){
       String insert = "";
@@ -78,6 +84,23 @@ public class DataAccessObject {
           Statement statement = connection.createStatement();
           //Calculate Delta DAF and insert into the stats table
           insert = buildDAFInsertStatement(args);
+          statement.executeUpdate(insert);
+          statement.close();
+      } catch (Exception e){
+          System.err.println( e.getClass().getName() + ": " + e.getMessage() );
+          System.out.println(insert);
+      }
+    }
+
+    public void getFst(String... args){
+      String insert = "";
+      try {
+          if(connection == null)
+              Connect();
+
+          Statement statement = connection.createStatement();
+          //Calculate Delta DAF and insert into the stats table
+          insert = buildFSTInsertStatement(args);
           statement.executeUpdate(insert);
           statement.close();
       } catch (Exception e){
@@ -120,12 +143,14 @@ public class DataAccessObject {
                 //need two allele tables depending if we are working with humans or not
     }
 
+    //We need to make sure that data storage types will not introduce roundoff error!
     private String makeTargetSNPTableCreateStatement() {
         return "CREATE TABLE IF NOT EXISTS " + TARGETSNPS +
                 " (rsid TEXT PRIMARY KEY NOT NULL," +
                 " chr INT NOT NULL," +
                 " pos INT NOT NULL," +
-                " freq REAL NOT NULL)";
+                " freq REAL NOT NULL," +
+                " n REAL NOT NULL)";
     }
 
     private String makeCrossSNPTableCreateStatement() {
@@ -133,7 +158,8 @@ public class DataAccessObject {
                 " (rsid TEXT PRIMARY KEY NOT NULL," +
                 " chr INT NOT NULL," +
                 " pos INT NOT NULL," +
-                " freq REAL NOT NULL)";
+                " freq REAL NOT NULL," +
+                " n REAL NOT NULL)";
     }
 
     private String makeHumanSNPTableCreateStatement() {
@@ -141,9 +167,10 @@ public class DataAccessObject {
                 " (rsid TEXT PRIMARY KEY NOT NULL," +
                 " chr INT NOT NULL," +
                 " pos INT NOT NULL," +
-                " freq REAL NOT NULL" +
-                " target REAL NOT NULL" +
-                " cross REAL NOT NULL)";
+                " freq REAL NOT NULL," + //total frequency of all individuals sampled
+                " target REAL NOT NULL," + //freq of target subpopulation
+                " cross REAL NOT NULL," + //freq of cross subpopulation
+                " n REAL NOT NULL)";
     }
 
     private String makeIndividualTableCreateStatement() {
@@ -159,15 +186,29 @@ public class DataAccessObject {
                 " description TEXT)";
     }
 
-    //This method needs to be tested to insure it is calculating the correct values
+    //perhaps add another table or extend this one to hold intermediate calculations for FST, etc.
+    //N so that we can reuse N to calculate D.  Also maybe q.
+    private String makeStatsTableCreateStatement(){
+      return "CREATE TABLE IF NOT EXISTS " + STATS +
+              " (daf REAL NOT NULL," +
+              " fst REAL)";
+    }
+
+    //This method and the one below need to be tested to insure it is calculating the correct values
     private String buildDAFInsertStatement(String... args){
       return "INSERT INTO " + STATS + " ((SELECT " + args[0] + " FROM " + args[1] +
               ") - ( SELECT " + args[2] + " FROM " + args[3] + "))";
     }
 
-    private String makeStatsTableCreateStatement(){
-      return "CREATE TABLE IF NOT EXISTS " + STATS +
-              " (daf REAL NOT NULL)";
+    //Is this (and above) a valid way to update all rows at once?
+    //Would it be more optimized to get a result set, do the calculations in java,
+    //and then update?  Rather than having a crazy long formula....
+    private String buildFSTInsertStatement(String... args){
+      return "UPDATE " + STATS + " SET fst = ((SELECT SQUARE(daf) FROM " +
+       STATS + ") - (SELECT " + args[1] + " * (1 - " + args[1] +
+        " ) * n / (n - 1) FROM " + args[2]  + ") - (SELECT " + args[3] +
+        " * (1 - " + args[3] + " ) * n / (n - 1) FROM " + args[4]  + ")";
+      //so far this is only implementing N
     }
 
 }
