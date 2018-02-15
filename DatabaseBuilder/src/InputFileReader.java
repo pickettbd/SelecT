@@ -117,7 +117,7 @@ class InputFileReader {
               }
 
               //We need to create a different table for humans that has two more rows
-              dao.insert(dao.HUMANSNPS, id, chrom, pos, freq, target, cross, n);
+              dao.insert(dao.HUMANSNPS, id, chrom, pos, freq, target, cross, n, n);
             }
 
             //Iterate through individuals and store each of their alleles into allele table

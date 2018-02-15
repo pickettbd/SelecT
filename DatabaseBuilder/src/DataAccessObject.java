@@ -1,6 +1,7 @@
 import java.sql.*;
 import java.lang.StringBuilder;
 import java.io.*;
+import java.util.*;
 
 public class DataAccessObject {
     public final static String ALLELES = "alleles";
@@ -9,7 +10,7 @@ public class DataAccessObject {
     public final static String HUMANSNPS = "humansnps";
     public final static String INDIVIDUALS = "individuals";
     public final static String POPULATIONS = "populations";
-    public final static String STATS = "stats";  //for right now, this table only holds Delta DAF
+    public final static String STATS = "stats";  //for right now, this table only holds Delta DAF and FST
 
     private Connection connection;
     //Somewhere in the code we need to figure out where to commit the changes that are made in each function.
@@ -78,40 +79,27 @@ public class DataAccessObject {
 
     //Maybe we can combine this function and the ones above and below since they are similar?
     //add some keyword for which function to call for the value of insert
-    public ResultSet getAlleleFrequency(String... args){
-      ResultSet rs = new ResultSet();
+    public List<AlleleFrequency> getAlleleFrequency(String... args){
       String insert = "";
+      List<AlleleFrequency> list = new ArrayList<AlleleFrequency>();
       try {
           if(connection == null)
               Connect();
 
           Statement statement = connection.createStatement();
-          //Calculate Delta DAF and insert into the stats table
           insert = buildAlleleFrequencyInsertStatement(args);
-          rs = statement.executeQuery(insert);
+          System.out.println(insert);
+          ResultSet rs = statement.executeQuery(insert);
+          while (rs.next()) {
+            AlleleFrequency af = new AlleleFrequency(rs.getDouble("targetfreq"), rs.getDouble("crossfreq"), rs.getDouble("targetn"), rs.getDouble("crossn"));
+            list.add(af);
+          }
           statement.close();
-          return rs;
+          return list;
       } catch (Exception e){
           System.err.println( e.getClass().getName() + ": " + e.getMessage() );
           System.out.println(insert);
-          return null
-      }
-    }
-
-    public void getFst(String... args){
-      String insert = "";
-      try {
-          if(connection == null)
-              Connect();
-
-          Statement statement = connection.createStatement();
-          //Calculate Delta DAF and insert into the stats table
-          insert = buildFSTInsertStatement(args);
-          statement.executeUpdate(insert);
-          statement.close();
-      } catch (Exception e){
-          System.err.println( e.getClass().getName() + ": " + e.getMessage() );
-          System.out.println(insert);
+          return null;
       }
     }
 
@@ -120,6 +108,14 @@ public class DataAccessObject {
             connection.commit();
         } catch (Exception e) {
         }
+    }
+
+    public void close(){
+      try {
+        connection.close();
+      } catch (Exception e){
+        
+      }
     }
 
     private String buildInsertStatement(String... args) {
@@ -156,8 +152,8 @@ public class DataAccessObject {
                 " (rsid TEXT PRIMARY KEY NOT NULL," +
                 " chr INT NOT NULL," +
                 " pos INT NOT NULL," +
-                " freq REAL NOT NULL," +
-                " n REAL NOT NULL)";
+                " targetfreq REAL NOT NULL," +
+                " targetn REAL NOT NULL)"; //number of alleles sampled
     }
 
     private String makeCrossSNPTableCreateStatement() {
@@ -165,8 +161,8 @@ public class DataAccessObject {
                 " (rsid TEXT PRIMARY KEY NOT NULL," +
                 " chr INT NOT NULL," +
                 " pos INT NOT NULL," +
-                " freq REAL NOT NULL," +
-                " n REAL NOT NULL)";
+                " crossfreq REAL NOT NULL," +
+                " crossn REAL NOT NULL)"; //number of alleles sampled
     }
 
     private String makeHumanSNPTableCreateStatement() {
@@ -175,9 +171,10 @@ public class DataAccessObject {
                 " chr INT NOT NULL," +
                 " pos INT NOT NULL," +
                 " freq REAL NOT NULL," + //total frequency of all individuals sampled
-                " target REAL NOT NULL," + //freq of target subpopulation
-                " cross REAL NOT NULL," + //freq of cross subpopulation
-                " n REAL NOT NULL)";
+                " targetfreq REAL NOT NULL," + //freq of target subpopulation
+                " crossfreq REAL NOT NULL," + //freq of cross subpopulation
+                " targetn REAL NOT NULL," + //number of target alleles sampled
+                " crossn REAL NOT NULL)"; //number of cross alleles sampled
                 //This table only handles one human file; do we need to inclue the ID
                 //so we can potentially run multiple human files?
                 //As the program is now, it can only run one/one set of files at a time...
@@ -205,32 +202,15 @@ public class DataAccessObject {
     }
 
     private String buildAlleleFrequencyInsertStatement(String... args){
-      String SQL = "";
-      if (args.length == 2) {
-        //build SQL statement
+      String SQL = new String("SELECT " + args[0]);
+      for (int i = 1; i < 4; i++) {
+        SQL = SQL + ", " + args[i];
       }
-      if (args.length == 4) {
-        //build SQL statement
+      SQL = SQL + " FROM " + args[4];
+      if (args.length == 6) {
+        SQL = SQL + ", " + args[5];
       }
       return SQL;
-    }
-
-    //This method and the one below need to be tested to insure it is calculating the correct values
-    private String buildDAFInsertStatement(String... args){
-      System.out.println("DAF insert statement built");
-      return "INSERT INTO " + STATS + " (SELECT " + args[0] + " FROM " + args[1] +
-              ") " ;//"- ( SELECT " + args[2] + " FROM " + args[3] + "))";
-    }
-
-    //Is this (and above) a valid way to update all rows at once?
-    //Would it be more optimized to get a result set, do the calculations in java,
-    //and then update?  Rather than having a crazy long formula....
-    private String buildFSTInsertStatement(String... args){
-      return "UPDATE " + STATS + " SET fst = ((SELECT SQUARE(daf) FROM " +
-       STATS + ") - (SELECT " + args[1] + " * (1 - " + args[1] +
-        " ) * n / (n - 1) FROM " + args[2]  + ") - (SELECT " + args[3] +
-        " * (1 - " + args[3] + " ) * n / (n - 1) FROM " + args[4]  + ")";
-      //so far this is only implementing N
     }
 
 }

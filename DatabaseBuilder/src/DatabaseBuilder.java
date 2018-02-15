@@ -15,6 +15,7 @@ class DatabaseBuilder {
                 fileNotFound();
             else {
               dataAccess.commit();
+              dataAccess.close();
       		    System.out.println("File successfully imported!\n");
             }
         } catch (IOException e) {
