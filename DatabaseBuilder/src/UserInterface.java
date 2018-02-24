@@ -28,7 +28,7 @@ class UserInterface {
                     numberOfFiles = 2;
                     break;
                 default:
-                    System.out.println("Invalid selection. Please try again.");
+                    System.out.println("Invalid selection. Please quit and try again.");
            }
         } catch (IOException e) {
             System.out.println("Input error: " + e.getMessage());

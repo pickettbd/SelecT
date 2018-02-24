@@ -12,10 +12,10 @@ class InputFileReader {
     public boolean readFile(String filename, String popid, String popDescription) throws IOException {
         //Prepare reader
         FileReader fileReader;
-	try {
-	        String workingDirectory = System.getProperty("user.dir") + "/DatabaseBuilder/test/";
+	      try {
+	          String workingDirectory = System.getProperty("user.dir") + "/DatabaseBuilder/test/";
             fileReader = new FileReader(workingDirectory + filename);
-	} catch (FileNotFoundException e) {
+	      } catch (FileNotFoundException e) {
             return false;
         }
         BufferedReader buffReader = new BufferedReader(fileReader);
@@ -88,17 +88,20 @@ class InputFileReader {
             //We need to have two different tables, one for each file, not just SNPS
             if (popDescription.equals("target")) {
               dao.insert(dao.TARGETSNPS, id, chrom, pos, freq, n);
+              //System.out.println("target entered");
 
             }
 
-            if (popDescription.equals("cross")) {
+            else if (popDescription.equals("cross")) { //THIS ELSE NEEDS TO BE PUSHED ONTO GITHUB!!
               dao.insert(dao.CROSSSNPS, id, chrom, pos, freq, n);
+              //System.out.println("cross entered");
 
             }
 
             //in the case of a single human file where we need two additional columns
             else {
               //Get frequency of target and cross populations from INFO column
+              //System.out.println("popDescription is " + popDescription);
               String target = "";
               for (String infoPart : info) {
                   if(infoPart.startsWith(targetPopulation)) {

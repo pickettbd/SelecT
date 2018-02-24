@@ -34,7 +34,7 @@ public class DataAccessObject {
         //Connect to database
         String currentDirectory = System.getProperty("user.dir");
         //Determines location of database in file structure
-        System.out.println(currentDirectory);
+        //System.out.println(currentDirectory);
 
         connection = DriverManager.getConnection("jdbc:sqlite:" + currentDirectory + "/DatabaseBuilder/src/db/SELECT.db");
         connection.setAutoCommit(false);
@@ -88,10 +88,11 @@ public class DataAccessObject {
 
           Statement statement = connection.createStatement();
           insert = buildAlleleFrequencyInsertStatement(args);
-          System.out.println(insert);
+          //System.out.println(insert);
           ResultSet rs = statement.executeQuery(insert);
           while (rs.next()) {
             AlleleFrequency af = new AlleleFrequency(rs.getDouble("targetfreq"), rs.getDouble("crossfreq"), rs.getDouble("targetn"), rs.getDouble("crossn"));
+
             list.add(af);
           }
           statement.close();
@@ -114,7 +115,7 @@ public class DataAccessObject {
       try {
         connection.close();
       } catch (Exception e){
-        
+
       }
     }
 
@@ -209,7 +210,9 @@ public class DataAccessObject {
       SQL = SQL + " FROM " + args[4];
       if (args.length == 6) {
         SQL = SQL + ", " + args[5];
+        SQL = SQL + " WHERE targetsnps.rsid = crosssnps.rsid";
       }
+      //System.out.println("insert = " + SQL);
       return SQL;
     }
 

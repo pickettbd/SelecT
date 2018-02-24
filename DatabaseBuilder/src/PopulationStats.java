@@ -14,7 +14,7 @@ public class PopulationStats {
     }
 
     public void calculateStats(int numberOfFiles){
-      System.out.println("calculate stats called" + numberOfFiles);
+      //System.out.println("calculate stats called" + numberOfFiles);
       List<AlleleFrequency> list = getAlleleFrequency(numberOfFiles);
       //rs.first();
       for(int i = 0; i < list.size(); i++){
@@ -23,8 +23,8 @@ public class PopulationStats {
         double FST;
         DAF = calculateDeltaDAF(list.get(i).getTargetFreq(), list.get(i).getCrossFreq());
         FST = calculateFst(list.get(i).getTargetFreq(), list.get(i).getCrossFreq(), list.get(i).getTargetN(), list.get(i).getCrossN());
-        System.out.println("DAF: " + DAF + " FST: " + FST);
-        System.out.println(String.valueOf(DAF) + " " + String.valueOf(FST));
+        //System.out.println("DAF: " + DAF + " FST: " + FST);
+        //System.out.println(String.valueOf(DAF) + " " + String.valueOf(FST));
         //add iHH, etc
         dao.insert(dao.STATS, String.valueOf(DAF), String.valueOf(FST));
       }
@@ -42,7 +42,10 @@ public class PopulationStats {
       }
     }
 
+    //Should this be in absolute value?
     private double calculateDeltaDAF(double target, double cross){
+      //System.out.println(target);
+      //System.out.println(cross);
       return target - cross;
     }
 
