@@ -22,7 +22,7 @@ public class PopulationStats {
         double DAF;
         double FST;
         DAF = calculateDeltaDAF(list.get(i).getTargetFreq(), list.get(i).getCrossFreq());
-        FST = calculateFst(list.get(i).getTargetFreq(), list.get(i).getCrossFreq(), list.get(i).getTargetN(), list.get(i).getCrossN());
+        FST = calculateFST(list.get(i).getTargetFreq(), list.get(i).getCrossFreq(), list.get(i).getTargetN(), list.get(i).getCrossN());
         //System.out.println("DAF: " + DAF + " FST: " + FST);
         //System.out.println(String.valueOf(DAF) + " " + String.valueOf(FST));
         //add iHH, etc
@@ -51,12 +51,32 @@ public class PopulationStats {
 
 
 //check if a double really is the best way of maintaining decimal precision!
-    private double calculateFst(double target, double cross, double targetN, double crossN) {
+    private Double calculateFST(double target, double cross, double targetN, double crossN) {
+      double h1;
+      h1 = (target * (1 - target) * targetN/(targetN - 1));
+      double h2;
+      h2 = (cross * (1 - cross) * crossN/(crossN - 1));
       double numerator;
       double denominator;
-      numerator = Math.pow((target - cross), 2) - target * (1 - target)*targetN/(targetN - 1) - cross * (1 - cross) * crossN/(crossN - 1);
-      denominator = numerator + 2 * target * (1 - target) + 2 * cross * (1 - cross);
-      return numerator/denominator;
+      numerator = Math.pow((target - cross), 2) - h1/targetN - h2/crossN;
+      denominator = numerator + h1 + h2;
+      //numerator = Math.pow((target - cross), 2) - target * (1 - target)*targetN/(targetN - 1) - cross * (1 - cross) * crossN/(crossN - 1);
+      //denominator = numerator + 2 * target * (1 - target) + 2 * cross * (1 - cross);
+      double fst;
+      if (numerator == 0 && denominator == 0) {
+        fst = 0;
+      }
+      else if (numerator != 0 && denominator == 0) {
+        fst = 1;
+      }
+      else {
+        fst = numerator/denominator;
+      }
+      return fst;
     }
+
+    //private double calculateFST(){
+      // saved N and D and am modifying to sum both
+    //}
 
 }
