@@ -77,6 +77,10 @@ public class DataAccessObject {
         }
     }
 
+    public void update(String... args) {
+
+    }
+
     //Maybe we can combine this function and the ones above and below since they are similar?
     //add some keyword for which function to call for the value of insert
     public List<AlleleFrequency> getAlleleFrequency(String... args){
