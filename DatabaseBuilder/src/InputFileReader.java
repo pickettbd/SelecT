@@ -23,9 +23,6 @@ class InputFileReader {
         String line;
         List<String> individualIDs = new ArrayList<>();
 
-        //Insert the population ID and description to its table
-        dao.insert(dao.POPULATIONS, popid, popDescription);
-
 
         String targetPopulation = "";
         String crossPopulation = "";
@@ -36,6 +33,7 @@ class InputFileReader {
         }
 
         //Read in lines of .vcf files.
+        int lineNumber = 0;
         while ((line = buffReader.readLine()) != null){
             if(line.charAt(0) == '#') {
                 //Ignore ## header lines. Single # line contains column headings
@@ -43,13 +41,21 @@ class InputFileReader {
                     //Break up header to get individual IDs (from position 9 until the end of line)
                     String[] parts = line.split("\t");
                     for(int i = 9; i < parts.length; i++){
-                        dao.insert(dao.INDIVIDUALS, parts[i], popid);
+                        //dao.insert(dao.INDIVIDUALS, parts[i], popid);
                         individualIDs.add(parts[i]);
                     }
+                    dao.CreateTables(individualIDs);
+                    dao.insert(dao.POPULATIONS, popid, popDescription);
                 }
                 continue;
             }
+
+
+            //Insert the population ID and description to its table
+
             String[] parts = line.split("\t");
+
+
             /*
              [0] = CHROM chromosome number
              [1] = POS reference position, with first base at position 1
@@ -92,7 +98,7 @@ class InputFileReader {
 
             }
 
-            else if (popDescription.equals("cross")) { //THIS ELSE NEEDS TO BE PUSHED ONTO GITHUB!!
+            else if (popDescription.equals("cross")) {
               dao.insert(dao.CROSSSNPS, id, chrom, pos, freq, n);
               //System.out.println("cross entered");
 
@@ -124,12 +130,20 @@ class InputFileReader {
             }
 
             //Iterate through individuals and store each of their alleles into allele table
+            String[] finalAlleles = new String[2*individualIDs.size() + 3];
+            int j = 0;
+            finalAlleles[j++] = dao.ALLELES;
+            finalAlleles[j++] = String.valueOf(lineNumber);
+            finalAlleles[j++] = id;
             for(int i = 9; i < parts.length; i++){
                 String[] alleles = parts[i].split("|");
-                dao.insert(dao.ALLELES, id, individualIDs.get(i-9), "0", alleles[0]);
-                dao.insert(dao.ALLELES, id, individualIDs.get(i-9), "1", alleles[2]);
+                finalAlleles[j++] = alleles[0];
+                finalAlleles[j++] = alleles[2];
+                //dao.insert(dao.ALLELES, id, individualIDs.get(i-9), "0", alleles[0]);
+                //dao.insert(dao.ALLELES, id, individualIDs.get(i-9), "1", alleles[2]);
             }
-
+            dao.insert(finalAlleles);
+            lineNumber++;
         }
         return true;
     }

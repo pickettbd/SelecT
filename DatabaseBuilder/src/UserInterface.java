@@ -1,7 +1,7 @@
 import java.io.*;
 
 //Note to self: run from SelecT with java -cp ./DatabaseBuilder/src:./DatabaseBuilder/lib/ UserInterface
-//So how do I get a connection with the database?
+//compile from src like normal
 //Right now this program only works to run one set of stats- you have to delete the database and start over if you're going to do new files.
 //So how can we make this a little more useful- give the user the option to find multiple statistics from the pre-loaded database?
 class UserInterface {

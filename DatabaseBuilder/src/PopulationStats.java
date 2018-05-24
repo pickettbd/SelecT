@@ -13,25 +13,42 @@ public class PopulationStats {
       dao = new DataAccessObject();
     }
 
+    //clean it up- put the database calls either entirely in this function or not at all
     public void calculateStats(int numberOfFiles){
       //System.out.println("calculate stats called" + numberOfFiles);
       List<AlleleFrequency> list = getAlleleFrequency(numberOfFiles);
       //rs.first();
+      List<String> rsids = dao.getRSIDs();
+      List<List<Double>> EHH = calculateEHH(rsids);
+      List<Double> EHH0downstream = EHH.get(0);
+      List<Double> EHH0upstream = EHH.get(1);
+      List<Double> EHH1downstream = EHH.get(2);
+      List<Double> EHH1upstream = EHH.get(3);
+      //ADD for EHH1 up & down stream
+      //Write daf and fst to iterate through list on their own just like ehh does?
       for(int i = 0; i < list.size(); i++){
         //System.out.println("while loop entered");
         double DAF;
         double FST;
         DAF = calculateDeltaDAF(list.get(i).getTargetFreq(), list.get(i).getCrossFreq());
         FST = calculateFST(list.get(i).getTargetFreq(), list.get(i).getCrossFreq(), list.get(i).getTargetN(), list.get(i).getCrossN());
-        calculateEHH();
+         // Pass in rsids instead of making extra internal database call
         //System.out.println("DAF: " + DAF + " FST: " + FST);
         //System.out.println(String.valueOf(DAF) + " " + String.valueOf(FST));
         //add iHH, etc
-        dao.insert(dao.STATS, String.valueOf(DAF), String.valueOf(FST));
+        dao.insert(dao.STATS, rsids.get(i),
+          String.valueOf(DAF),
+          String.valueOf(FST),
+          String.valueOf(EHH0downstream.get(i)),
+          String.valueOf(EHH0upstream.get(i)),
+          String.valueOf(EHH1downstream.get(i)),
+          String.valueOf(EHH1upstream.get(i)));
       }
+      System.out.println("statistics calculated! Please view them in the database (src/db/SELECT.db)");
       dao.commit(); //is there anything we need to check for before committing?
       dao.close();
     }
+
 
     private List<AlleleFrequency> getAlleleFrequency(int numberOfFiles){
       if (numberOfFiles == 1) {
@@ -61,8 +78,6 @@ public class PopulationStats {
       double denominator;
       numerator = Math.pow((target - cross), 2) - h1/targetN - h2/crossN;
       denominator = numerator + h1 + h2;
-      //numerator = Math.pow((target - cross), 2) - target * (1 - target)*targetN/(targetN - 1) - cross * (1 - cross) * crossN/(crossN - 1);
-      //denominator = numerator + 2 * target * (1 - target) + 2 * cross * (1 - cross);
       double fst;
       if (numerator == 0 && denominator == 0) {
         fst = 0;
@@ -76,130 +91,163 @@ public class PopulationStats {
       return fst;
     }
 
-    private void calculateEHH() {
-        /*
 
-        **CALCULATING DOWNSTREAM EHH**
-         from the database, get all the RSIDs (or chrom and pos)
-         from the database, get the first row from the alleles table (ex. chrom 21, pos 9411239, rsid rs559462325 for the first one)
-         find each individual/allele combination that has a zero and add it to a list. (ex. HG0179-the first individual-has a 0 in both alleles)
-            maybe make a class to hold this. The class would have attributes individualid and allele (1 or 2).
-         do the same thing with each individual/allele combination that has a 1. You should have two lists now -
-            one with all 0s and the other with all 1s. These are your core haplotypes.
+    /*
 
-         create a map with a binary number key and an integer value.
-            the binary number key will be the haplotype and the integer value will be the number of occurances of that haplotype.
+    **CALCULATING DOWNSTREAM EHH**
+     from the database, get all the RSIDs (or chrom and pos)
+     from the database, get the first row from the alleles table (ex. chrom 21, pos 9411239, rsid rs559462325 for the first one)
+     find each individual/allele combination that has a zero and add it to a list. (ex. HG0179-the first individual-has a 0 in both alleles)
+        maybe make a class to hold this. The class would have attributes individualid and allele (1 or 2).
+     do the same thing with each individual/allele combination that has a 1. You should have two lists now -
+        one with all 0s and the other with all 1s. These are your core haplotypes.
 
-         from the database, retrieve the column from the alleles table with an individual ID matching the first individual in the 0 list.
-            in our test database, that should be HG01879
-            note which chromosome the 0 occured on (allele 1 or 2).
-         create a StringBuilder called "haplotype"
-         iterate through each SNP following the core haplotype at the same allele as the core haplotype, appending its value to "haplotype"
-            if the core haplotype was on allele 1, run this on allele 1 for the rest of the SNPs.
-         convert "haplotype" to a binary integer and check to see if its value has been inserted into the map yet
-            if it has, increment the value found there
-            if it has not, create the entry with value 1 (ex. Set.add(0100010111010100010100110100000100, 1))
-         Repeat with each individual in the 0 list.
+     create a map with a binary number key and an integer value.
+        the binary number key will be the haplotype and the integer value will be the number of occurances of that haplotype.
 
-         now that we have found all the haplotypes following each occurance of 0 in the SNP we're looking at, we can calculate EHH0.
-         create a double called "EHH"
-         iterate through the members of your map
-            for each member, divide the value by the size of the 0 list and square the result
-            add this to "EHH"
-         you now have EHH0. Store this in the database.
+     from the database, retrieve the column from the alleles table with an individual ID matching the first individual in the 0 list.
+        in our test database, that should be HG01879
+        note which chromosome the 0 occured on (allele 1 or 2).
+     create a StringBuilder called "haplotype"
+     iterate through each SNP following the core haplotype at the same allele as the core haplotype, appending its value to "haplotype"
+        if the core haplotype was on allele 1, run this on allele 1 for the rest of the SNPs.
+     convert "haplotype" to a binary integer and check to see if its value has been inserted into the map yet
+        if it has, increment the value found there
+        if it has not, create the entry with value 1 (ex. Set.add(0100010111010100010100110100000100, 1))
+     Repeat with each individual in the 0 list.
 
-         to calculate EHH1, repeat this process with the 1 list
+     now that we have found all the haplotypes following each occurance of 0 in the SNP we're looking at, we can calculate EHH0.
+     create a double called "EHH"
+     iterate through the members of your map
+        for each member, divide the value by the size of the 0 list and square the result
+        add this to "EHH"
+     you now have EHH0. Store this in the database.
 
-         repeat this for each locus
+     to calculate EHH1, repeat this process with the 1 list
 
-         (note: we will also need to calculate upstream EHH to calculate iHH)
+     repeat this for each locus
+
+     (note: we will also need to calculate upstream EHH to calculate iHH)
 
 
-         **Pseudocode:**
+     **Pseudocode:**
+    */
+    private List<List<Double>> calculateEHH(List<String> rsids) {
 
-         class Allele {
-            public Allele(String i, int a) {
-                this.individualID = i;
-                this.alleleNumber = a;
 
-            public String individualID;
-            public int alleleNumber;
-         }
-
-         List<String> rsids = database.getRSIDs();
-         List<double> downstreamEHHs = new ArrayList<>();
-         List<double> upstreamEHHs = new ArrayList<>();
+         //List<String> rsids = database.getRSIDs();
+         //integer tableSize = database.getAlleleTableSize(); // Hannah added but don't think we need
+         int rsidIndex = 0; //This will allow us to query the database appropriately according to rsid which may not be in numerical order.
+         List<Double> downstreamEHH0s = new ArrayList<>();
+         List<Double> upstreamEHH0s = new ArrayList<>();
+         List<Double> downstreamEHH1s = new ArrayList<>();
+         List<Double> upstreamEHH1s = new ArrayList<>();
+         List<String> individualIDs = dao.getIndividualIDs();
+         System.out.println(individualIDs.toString());
          for(String rsid : rsids) {
-            List<Object> alleles = database.get(table=alleles, column=*, WHERE rsid = <rsid>);
-            List<Allele> list0 = new List<>();
-            List<Allele> list1 = new List<>();
+           //for Dr. Ridge- why are rsids not in numerical order? is the order in a VCF file random??
+            List<Integer> alleles = dao.getAlleleRow(rsid);
+            List<Integer> list0 = new ArrayList<>();
+            List<Integer> list1 = new ArrayList<>();
 
-            for(Object allele : alleles) {
-                //not sure how the data will be returned by the database - maybe as a json that we should convert to a Java object?
-                if(allele.getAllele1() == 0) {
-                    list0.push(new Allele(allele.getIndividualID(), 1));
-                } else if(allele.getAllele1() == 1) {
-                    list1.push(new allele(allele.getIndividualID(), 1));
+            int individualIDindex = 0;
+            for(Integer allele : alleles) {
+                //how can I get the individual's id?
+                if(allele == 0) {
+                    list0.add(individualIDindex);
+                } else if(allele == 1) {
+                    list1.add(individualIDindex);
                 }
-                if(allele.getAllele2() == 0) {
-                    list0.push(new Allele(allele.getIndividualID(), 2));
-                } else if(allele.getAllele2() == 1) {
-                    list1.push(new allele(allele.getIndividualID(), 2));
-                }
+                individualIDindex++;
             }
 
-            Map<String, int> downstreamHaplotypes = new Map<>();
-            Map<String, int> upstreamHaplotypes = new Map<>();
-
-            for(Allele allele : list0) {
-                List<Object> downstreamSNPs = database.get(table=alleles, column=<allele.individualID>, WHERE <rsid is after the current one>);
-                List<Object> upstreamSNPs = database.get(table=alleles, column=<allele.individualID>, WHERE <rsid is before the current one> ORDER BY rsid DESC);
-                    // note: in the final implementation, this will need to be limited to the next and previous million SNPs, respectively.
-                    // see supporting online material for "A Composite of Multiple Signals" which indicates 1MB before and after the SNP of interest.
-                StringBuilder downstreamHaplotype = new StringBuilder();
-                StringBuilder upstreamHaplotype = new StringBuilder();
-
-                if(allele.alleleNumber == 1) {
-                    for(Object snp : downstreamSNPs) {
-                        downstreamHaplotype.append(snp.getAllele1);
-                    }
-                    for(Object snp : upstreamSNPs) {
-                        upstreamHaplotype.append(snp.getAllele1);
-                } else {
-                    for(Object snp : downstreamSNPs) {
-                        downstreamHaplotype.append(snp.getAllele2);
-                    }
-                    for(Object snp : upstreamSNPs) {
-                        upstreamHaplotype.append(snp.getAllele2);
-                    }
-                }
-
-                if(downstreamHaplotypes.keyExists(downstreamHaplotype.toString) {
-                    downstreamHaplotypes.set(downstreamHaplotype.toString, downstreamHaplotypes.get(downstreamHaplotype.toString) + 1);
-                } else {
-                    downstreamHaplotypes.set(downstreamHaplotype.toString, 1);
-                }
-
-                if(upstreamHaplotypes.keyExists(upstreamHaplotype.toString) {
-                    upstreamHaplotypes.set(upstreamHaplotype.toString, upstreamHaplotypes.get(upstreamHaplotype.toString) + 1);
-                } else {
-                    upstreamHaplotypes.set(upstreamHaplotype.toString, 1);
-                }
-            }
-
-            double EHH = 0;
-            for (Map.Entry<String, int> entry : downstreamHaplotypes.entrySet()) {
-                EHH += Math.pow(entry.getValue / list0.size(), 2);
-            }
-            downstreamEHHs.push(EHH);
-            EHH = 0;
-            for (Map.Entry<String, int> entry : upstreamHaplotypes.entrySet()) {
-                EHH += Math.pow(entry.getValue / list0.size(), 2);
-            }
-            upstreamEHHs.push(EHH);
+            //insert parameters!!!  Break up into two seperate function calls.
+            //Calculate statistics for the current rsid
+            List<Double> EHHs = calculateDownstreamAndUpstreamEHH(individualIDs, list0, rsidIndex);
+            downstreamEHH0s.add(EHHs.get(0));
+            upstreamEHH0s.add(EHHs.get(1));
+            EHHs = calculateDownstreamAndUpstreamEHH(individualIDs, list1, rsidIndex);
+            downstreamEHH1s.add(EHHs.get(0));
+            upstreamEHH1s.add(EHHs.get(1));
+            rsidIndex++;
          }
-         database.update(rsids, downstreamEHHs);
-         database.update(rsids, upstreamEHHs);
-        */
+
+         //return all statistics
+         List<List<Double>> returnValues = new ArrayList<List<Double>>();
+         returnValues.add(downstreamEHH0s);
+         returnValues.add(upstreamEHH0s);
+         returnValues.add(downstreamEHH1s);
+         returnValues.add(upstreamEHH1s);
+         return returnValues;
+    }
+
+//break down bottom function into these three?
+/*
+    private Double calculateDownstreamEHH(List<String> individualIDs, List<Integer> alleleLocations, int rsidIndex){
+
+    }
+    private Double calculateUpstreamEHH(List<String> individualIDs, List<Integer> alleleLocations, int rsidIndex){
+
+    }
+
+    private Double findAlleleFrequency(List<String> individualIDs, List<Integer> alleleLocations, int rsidIndex){
+
+    }
+    */
+
+    private List<Double> calculateDownstreamAndUpstreamEHH(List<String> individualIDs, List<Integer> alleleLocations, int rsidIndex){
+      Map<String, Integer> downstreamHaplotypes = new HashMap<>();
+      Map<String, Integer> upstreamHaplotypes = new HashMap<>();
+
+      //System.out.println("Allele locations: " + alleleLocations.toString());
+      //System.out.println("rsid index: " + rsidIndex);
+
+      for(int individual : alleleLocations) {
+          List<Integer> downstreamSNPs = dao.getAlleleColumn(individualIDs.get(individual), "WHERE row > " + String.valueOf(rsidIndex));
+          //System.out.println("downstream SNPS: " + downstreamSNPs.toString());
+          List<Integer> upstreamSNPs = dao.getAlleleColumn(individualIDs.get(individual), "WHERE row < " + String.valueOf(rsidIndex)); //ORDER BY rsid DESC
+              // note: in the final implementation, this will need to be limited to the next and previous million SNPs, respectively.
+              // see supporting online material for "A Composite of Multiple Signals" which indicates 1MB before and after the SNP of interest.
+          StringBuilder downstreamHaplotype = new StringBuilder();
+          StringBuilder upstreamHaplotype = new StringBuilder();
+
+          for(Object snp : downstreamSNPs) {
+              downstreamHaplotype.append(snp);
+          }
+          for(Object snp : upstreamSNPs) {
+              upstreamHaplotype.append(snp);
+          }
+
+          if(downstreamHaplotypes.containsKey(downstreamHaplotype.toString())) {
+              downstreamHaplotypes.put(downstreamHaplotype.toString(), downstreamHaplotypes.get(downstreamHaplotype.toString()) + 1);
+          } else {
+              downstreamHaplotypes.put(downstreamHaplotype.toString(), 1);
+          }
+
+          if(upstreamHaplotypes.containsKey(upstreamHaplotype.toString())) {
+              upstreamHaplotypes.put(upstreamHaplotype.toString(), upstreamHaplotypes.get(upstreamHaplotype.toString()) + 1);
+          } else {
+              upstreamHaplotypes.put(upstreamHaplotype.toString(), 1);
+          }
+      }
+
+      double downstreamEHH = 0;
+      //System.out.println(downstreamHaplotypes.toString());
+      //System.out.println(String.valueOf(alleleLocations.size()));
+      for (Map.Entry<String, Integer> entry : downstreamHaplotypes.entrySet()) {
+        //we're assuming alleleLocations.size != 0
+          downstreamEHH += Math.pow( ((double) entry.getValue()) / alleleLocations.size(), 2);
+          //System.out.println(downstreamEHH);
+          //System.out.println(entry.getValue() + " " + alleleLocations.size());
+      }
+      double upstreamEHH = 0;
+      for (Map.Entry<String, Integer> entry : upstreamHaplotypes.entrySet()) {
+          upstreamEHH += Math.pow( ((double) entry.getValue()) / alleleLocations.size(), 2);
+      }
+
+      List<Double> returnValues = new ArrayList<Double>();
+      returnValues.add(downstreamEHH);
+      returnValues.add(upstreamEHH);
+      return returnValues;
     }
 }

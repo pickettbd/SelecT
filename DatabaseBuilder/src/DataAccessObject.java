@@ -10,15 +10,15 @@ public class DataAccessObject {
     public final static String HUMANSNPS = "humansnps";
     public final static String INDIVIDUALS = "individuals";
     public final static String POPULATIONS = "populations";
-    public final static String STATS = "stats";  //for right now, this table only holds Delta DAF and FST
+    public final static String STATS = "stats";  //still need to add the last 2 stats
 
+    private static List<String> individualIDs;
     private Connection connection;
     //Somewhere in the code we need to figure out where to commit the changes that are made in each function.
     //Also need to figure out where (and what...) to close stuff.
     public DataAccessObject() {
         try {
            Connect();
-           CreateTables();
         } catch (Exception e) {
             System.err.println("error from DAO");
             System.err.println( e.getClass().getName() + ": " + e.getMessage() );
@@ -40,13 +40,14 @@ public class DataAccessObject {
         connection.setAutoCommit(false);
     }
 
-    public void CreateTables() {
+    public void CreateTables(List<String> individualIDs) {
+      //System.out.println("createTables called");
         try {
             if(connection == null)
                 Connect();
 
             Statement stmt = connection.createStatement();
-            stmt.executeUpdate(makeAlleleTableCreateStatement());
+            stmt.executeUpdate(makeAlleleTableCreateStatement(individualIDs));
             stmt.executeUpdate(makeCrossSNPTableCreateStatement());
             stmt.executeUpdate(makeHumanSNPTableCreateStatement());
             stmt.executeUpdate(makeTargetSNPTableCreateStatement());
@@ -57,7 +58,7 @@ public class DataAccessObject {
         } catch (Exception e) {
             System.err.println("this happened in CreateTables");
             System.err.println( e.getClass().getName() + ": " + e.getMessage() );
-            //System.err.println( e.printStackTrace());
+            e.printStackTrace();
         }
     }
 
@@ -108,6 +109,69 @@ public class DataAccessObject {
       }
     }
 
+    public List<String> getRSIDs(){
+      String request = "SELECT rsid FROM alleles";
+      //is this the most efficient list type?
+      List<String> rsids = new ArrayList<String>();
+      try{
+        if (connection == null)
+          Connect();
+        Statement statement = connection.createStatement();
+        ResultSet rs = statement.executeQuery(request);
+
+        while (rs.next()){
+          rsids.add(rs.getString("rsid"));
+        }
+
+      }
+      catch (Exception e){
+        e.printStackTrace();
+      }
+      return rsids;
+    }
+
+    public List<Integer> getAlleleRow(String rsid){
+      //System.out.println(individualIDs.toString());
+      String request = "SELECT * FROM " + ALLELES + " WHERE rsid = '" + rsid + "';";
+      List<Integer> alleles = new ArrayList<Integer>();
+      try{
+        if (connection == null)
+          Connect();
+        Statement statement = connection.createStatement();
+        ResultSet rs = statement.executeQuery(request);
+
+        for (int i = 0; i < individualIDs.size(); i++){
+          alleles.add(rs.getInt(individualIDs.get(i)));
+        }
+
+      }
+      catch (Exception e){
+        e.printStackTrace();
+      }
+      return alleles;
+    }
+
+    public List<Integer> getAlleleColumn(String individualId, String whereClause){
+      String request = "SELECT " + individualId + " FROM " + ALLELES + " " + whereClause + ";";
+      //System.out.println(request);
+      List<Integer> alleles = new ArrayList<Integer>();
+      try{
+        if (connection == null)
+          Connect();
+        Statement statement = connection.createStatement();
+        ResultSet rs = statement.executeQuery(request);
+
+        while (rs.next()){
+          alleles.add(rs.getInt(individualId));
+        }
+
+      }
+      catch (Exception e){
+        e.printStackTrace();
+      }
+      return alleles;
+    }
+
     public void commit() {
         try {
             connection.commit();
@@ -139,16 +203,32 @@ public class DataAccessObject {
         return insert.toString();
     }
 
-    private String makeAlleleTableCreateStatement() {
-        return "CREATE TABLE IF NOT EXISTS " + ALLELES +
-                " (rsid TEXT NOT NULL," +
-                " individualid TEXT NOT NULL," +
-                " allele1 TEXT NOT NULL," +
-                " allele2 TEXT NOT NULL," +
-                " FOREIGN KEY(rsid) REFERENCES " + HUMANSNPS + "(rsid));";
+    private String makeAlleleTableCreateStatement(List<String> individualIDs) {
+        StringBuilder sb = new StringBuilder();
+        this.individualIDs = new ArrayList<String>();
+        sb.append("CREATE TABLE IF NOT EXISTS " + ALLELES +
+                " (row INTEGER PRIMARY KEY," +
+                " rsid TEXT NOT NULL" );
+                for (String id : individualIDs) {
+                  sb.append(", " + id + "allele1");
+                  sb.append(", " + id + "allele2");
+                  this.individualIDs.add(id + "allele1");
+                  this.individualIDs.add(id + "allele2");
+                }
+                sb.append(");");
+                //" FOREIGN KEY(rsid) REFERENCES " + HUMANSNPS + "(rsid));";
                 //HUMANSNPS was used so that the program will compile, but we need to look
                 //at which table should actually be referenced here.  We may
                 //need two allele tables depending if we are working with humans or not
+                //System.out.println("allele create table statement:");
+                //System.out.println(sb.toString());
+                //System.out.println(individualIDs);
+                //System.out.println(this.individualIDs);
+                return sb.toString();
+    }
+
+    public List<String> getIndividualIDs(){
+      return individualIDs;
     }
 
     //We need to make sure that data storage types will not introduce roundoff error!
@@ -202,8 +282,13 @@ public class DataAccessObject {
     //N so that we can reuse N to calculate D.  Also maybe q.
     private String makeStatsTableCreateStatement(){
       return "CREATE TABLE IF NOT EXISTS " + STATS +
-              " (daf REAL NOT NULL," +
-              " fst REAL)";
+              " (rsid TEXT PRIMARY KEY NOT NULL," +  //I need to find when I update the table to insert this
+              " daf REAL NOT NULL," +
+              " fst REAL," +
+              " ehh0downstream REAL," +
+              " ehh0upstream REAL," +
+              " ehh1downstream REAL," +
+              " ehh1upstream REAL)";
     }
 
     private String buildAlleleFrequencyInsertStatement(String... args){
