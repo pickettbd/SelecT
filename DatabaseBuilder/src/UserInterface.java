@@ -6,7 +6,6 @@ import java.io.*;
 //So how can we make this a little more useful- give the user the option to find multiple statistics from the pre-loaded database?
 class UserInterface {
     private static String FILENAME_PROMPT = "Enter file name (It should be in the 'test' folder) (leave blank if none): ";
-    private static String POPULATIONID_PROMPT = "Enter UNIQUE population ID for data stored in the file: ";
     private static String POPULATIONDESC_PROMPT = "Enter a description of this population (human, target, or cross): ";
     private static String TARGETPOPULATION_PROMPT = "Enter the name of the target population (e.g. AFR_AF): ";
     private static String CROSSPOPULATION_PROMPT = "Enter the name of the cross population (e.g. AMR_AF): ";
@@ -28,7 +27,8 @@ class UserInterface {
                     numberOfFiles = 2;
                     break;
                 default:
-                    System.out.println("Invalid selection. Please quit and try again.");
+                    System.out.println("Invalid selection. Please restart and try again.");
+                    return;
            }
         } catch (IOException e) {
             System.out.println("Input error: " + e.getMessage());
@@ -68,8 +68,6 @@ class UserInterface {
         }
         //this creates a unique key for one of the tables... We need to verify that it is a valid key
         //or remove it altogether.
-        System.out.print(POPULATIONID_PROMPT);
-        populationID = input.readLine();
         System.out.print(POPULATIONDESC_PROMPT);  //!!!!Check for valid input: human, target, or cross
         description = input.readLine();
         InputTask task = new InputTask(filename, populationID, description);

@@ -8,47 +8,30 @@ import java.util.*;
 
 public class PopulationStats {
     private DataAccessObject dao;
+    private int DBLength;
 
     public PopulationStats(){
       dao = new DataAccessObject();
+      DBLength = dao.getDBLength();
     }
 
     //clean it up- put the database calls either entirely in this function or not at all
     public void calculateStats(int numberOfFiles){
       //System.out.println("calculate stats called" + numberOfFiles);
-      List<AlleleFrequency> list = getAlleleFrequency(numberOfFiles);
-      //rs.first();
-      List<String> rsids = dao.getRSIDs();
-      List<List<Double>> EHH = calculateEHH(rsids);
-      List<Double> EHH0downstream = EHH.get(0);
-      List<Double> EHH0upstream = EHH.get(1);
-      List<Double> EHH1downstream = EHH.get(2);
-      List<Double> EHH1upstream = EHH.get(3);
-      //ADD for EHH1 up & down stream
-      //Write daf and fst to iterate through list on their own just like ehh does?
-      for(int i = 0; i < list.size(); i++){
-        //System.out.println("while loop entered");
-        double DAF;
-        double FST;
-        DAF = calculateDeltaDAF(list.get(i).getTargetFreq(), list.get(i).getCrossFreq());
-        FST = calculateFST(list.get(i).getTargetFreq(), list.get(i).getCrossFreq(), list.get(i).getTargetN(), list.get(i).getCrossN());
-         // Pass in rsids instead of making extra internal database call
-        //System.out.println("DAF: " + DAF + " FST: " + FST);
-        //System.out.println(String.valueOf(DAF) + " " + String.valueOf(FST));
-        //add iHH, etc
-        dao.insert(dao.STATS, rsids.get(i),
-          String.valueOf(DAF),
-          String.valueOf(FST),
-          String.valueOf(EHH0downstream.get(i)),
-          String.valueOf(EHH0upstream.get(i)),
-          String.valueOf(EHH1downstream.get(i)),
-          String.valueOf(EHH1upstream.get(i)));
-      }
-      System.out.println("statistics calculated! Please view them in the database (src/db/SELECT.db)");
-      dao.commit(); //is there anything we need to check for before committing?
+      calculateDAFandFST(numberOfFiles);
+      dao.commit();  //is there anything we need to check for before committing?
+      calculateEHH();
+      dao.commit();
+      calculateIHH();
+      dao.commit();
+      calculateUnstandardizedIHS();
+      dao.commit();
+      calculateIHS();
+      dao.commit();
       dao.close();
-    }
 
+      System.out.println("statistics calculated! Please view them in the database.");
+    }
 
     private List<AlleleFrequency> getAlleleFrequency(int numberOfFiles){
       if (numberOfFiles == 1) {
@@ -60,35 +43,39 @@ public class PopulationStats {
       }
     }
 
-    //Should this be in absolute value?
-    private double calculateDeltaDAF(double target, double cross){
-      //System.out.println(target);
-      //System.out.println(cross);
-      return target - cross;
-    }
-
 
 //check if a double really is the best way of maintaining decimal precision!
-    private Double calculateFST(double target, double cross, double targetN, double crossN) {
-      double h1;
-      h1 = (target * (1 - target) * targetN/(targetN - 1));
-      double h2;
-      h2 = (cross * (1 - cross) * crossN/(crossN - 1));
-      double numerator;
-      double denominator;
-      numerator = Math.pow((target - cross), 2) - h1/targetN - h2/crossN;
-      denominator = numerator + h1 + h2;
-      double fst;
-      if (numerator == 0 && denominator == 0) {
-        fst = 0;
+//rename calculateFreqBasedStats?
+//Should DAF be in absolute value?
+    private void calculateDAFandFST(int numberOfFiles) {
+      List<AlleleFrequency> AF = getAlleleFrequency(numberOfFiles); //Combine this with DAF above for less space & database calls
+      for (int i = 0; i < DBLength; i++) {
+        double target = AF.get(i).getTargetFreq();
+        double cross = AF.get(i).getCrossFreq();
+        double targetN = AF.get(i).getTargetN();
+        double crossN = AF.get(i).getCrossN();
+
+        double h1;
+        h1 = (target * (1 - target) * targetN/(targetN - 1));
+        double h2;
+        h2 = (cross * (1 - cross) * crossN/(crossN - 1));
+        double numerator;
+        double denominator;
+        numerator = Math.pow((target - cross), 2) - h1/targetN - h2/crossN;
+        denominator = numerator + h1 + h2;
+        double fst;
+        if (numerator == 0 && denominator == 0) {
+          fst = 0;
+        }
+        else if (numerator != 0 && denominator == 0) {
+          fst = 1;
+        }
+        else {
+          fst = numerator/denominator;
+        }
+        dao.updateDB(dao.STATS, "daf", target - cross, i);
+        dao.updateDB(dao.STATS, "fst", fst, i);
       }
-      else if (numerator != 0 && denominator == 0) {
-        fst = 1;
-      }
-      else {
-        fst = numerator/denominator;
-      }
-      return fst;
     }
 
 
@@ -132,21 +119,12 @@ public class PopulationStats {
 
      **Pseudocode:**
     */
-    private List<List<Double>> calculateEHH(List<String> rsids) {
+    private void calculateEHH() {
 
-
-         //List<String> rsids = database.getRSIDs();
-         //integer tableSize = database.getAlleleTableSize(); // Hannah added but don't think we need
-         int rsidIndex = 0; //This will allow us to query the database appropriately according to rsid which may not be in numerical order.
-         List<Double> downstreamEHH0s = new ArrayList<>();
-         List<Double> upstreamEHH0s = new ArrayList<>();
-         List<Double> downstreamEHH1s = new ArrayList<>();
-         List<Double> upstreamEHH1s = new ArrayList<>();
          List<String> individualIDs = dao.getIndividualIDs();
-         System.out.println(individualIDs.toString());
-         for(String rsid : rsids) {
-           //for Dr. Ridge- why are rsids not in numerical order? is the order in a VCF file random??
-            List<Integer> alleles = dao.getAlleleRow(rsid);
+         //System.out.println(individualIDs.toString());
+         for(int row = 0; row < DBLength; row++) {
+            List<Integer> alleles = dao.getAlleleRow(row);
             List<Integer> list0 = new ArrayList<>();
             List<Integer> list1 = new ArrayList<>();
 
@@ -163,49 +141,37 @@ public class PopulationStats {
 
             //insert parameters!!!  Break up into two seperate function calls.
             //Calculate statistics for the current rsid
-            List<Double> EHHs = calculateDownstreamAndUpstreamEHH(individualIDs, list0, rsidIndex);
-            downstreamEHH0s.add(EHHs.get(0));
-            upstreamEHH0s.add(EHHs.get(1));
-            EHHs = calculateDownstreamAndUpstreamEHH(individualIDs, list1, rsidIndex);
-            downstreamEHH1s.add(EHHs.get(0));
-            upstreamEHH1s.add(EHHs.get(1));
-            rsidIndex++;
+            calculateDownstreamAndUpstreamEHH(individualIDs, list0, row, 0);
+            calculateDownstreamAndUpstreamEHH(individualIDs, list1, row, 1);
          }
-
-         //return all statistics
-         List<List<Double>> returnValues = new ArrayList<List<Double>>();
-         returnValues.add(downstreamEHH0s);
-         returnValues.add(upstreamEHH0s);
-         returnValues.add(downstreamEHH1s);
-         returnValues.add(upstreamEHH1s);
-         return returnValues;
     }
 
 //break down bottom function into these three?
 /*
-    private Double calculateDownstreamEHH(List<String> individualIDs, List<Integer> alleleLocations, int rsidIndex){
+    private Double calculateDownstreamEHH(List<String> individualIDs, List<Integer> alleleLocations, int row){
 
     }
-    private Double calculateUpstreamEHH(List<String> individualIDs, List<Integer> alleleLocations, int rsidIndex){
+    private Double calculateUpstreamEHH(List<String> individualIDs, List<Integer> alleleLocations, int row){
 
     }
 
-    private Double findAlleleFrequency(List<String> individualIDs, List<Integer> alleleLocations, int rsidIndex){
+    private Double findAlleleFrequency(List<String> individualIDs, List<Integer> alleleLocations, int row){
 
     }
     */
 
-    private List<Double> calculateDownstreamAndUpstreamEHH(List<String> individualIDs, List<Integer> alleleLocations, int rsidIndex){
+    private void calculateDownstreamAndUpstreamEHH(List<String> individualIDs, List<Integer> alleleLocations, int row, int id){
       Map<String, Integer> downstreamHaplotypes = new HashMap<>();
       Map<String, Integer> upstreamHaplotypes = new HashMap<>();
 
       //System.out.println("Allele locations: " + alleleLocations.toString());
-      //System.out.println("rsid index: " + rsidIndex);
+      //System.out.println("rsid index: " + row);
 
       for(int individual : alleleLocations) {
-          List<Integer> downstreamSNPs = dao.getAlleleColumn(individualIDs.get(individual), "WHERE row > " + String.valueOf(rsidIndex));
+        //Add the option for the user to include a window size?
+          List<Integer> downstreamSNPs = dao.getAlleleColumn(individualIDs.get(individual), "WHERE row > " + String.valueOf(row));
           //System.out.println("downstream SNPS: " + downstreamSNPs.toString());
-          List<Integer> upstreamSNPs = dao.getAlleleColumn(individualIDs.get(individual), "WHERE row < " + String.valueOf(rsidIndex)); //ORDER BY rsid DESC
+          List<Integer> upstreamSNPs = dao.getAlleleColumn(individualIDs.get(individual), "WHERE row < " + String.valueOf(row)); //ORDER BY rsid DESC
               // note: in the final implementation, this will need to be limited to the next and previous million SNPs, respectively.
               // see supporting online material for "A Composite of Multiple Signals" which indicates 1MB before and after the SNP of interest.
           StringBuilder downstreamHaplotype = new StringBuilder();
@@ -245,9 +211,143 @@ public class PopulationStats {
           upstreamEHH += Math.pow( ((double) entry.getValue()) / alleleLocations.size(), 2);
       }
 
-      List<Double> returnValues = new ArrayList<Double>();
-      returnValues.add(downstreamEHH);
-      returnValues.add(upstreamEHH);
-      return returnValues;
+      dao.updateDB(dao.STATS, "ehh" + String.valueOf(id) + "downstream", downstreamEHH, row);
+      dao.updateDB(dao.STATS, "ehh" + String.valueOf(id) + "upstream", upstreamEHH, row);
+    }
+
+//modify ehh and ihh to handle doing cross-population if that is an option
+//Loop through to do ehh0 AND ehh1 - right now this is only doing one or the other based on what is returned from the database
+//Find a way to make it stop at tails of chromosomes
+    private void calculateIHH(){
+      List<Double> EHH0downstream = dao.getStat("ehh0downstream");
+      List<Double> EHH0upstream = dao.getStat("ehh0upstream");
+      List<Double> EHH1downstream = dao.getStat("ehh1downstream");
+      List<Double> EHH1upstream = dao.getStat("ehh1upstream");
+      calculateIHH(EHH0downstream, EHH0upstream, 0);
+      calculateIHH(EHH1downstream, EHH1upstream, 1);
+    }
+
+
+    private void calculateIHH(List<Double> downstreamEHH, List<Double> upstreamEHH, int id){
+
+      for (int currentBasePair = 0; currentBasePair < upstreamEHH.size(); currentBasePair++){
+        //find a way to do this loop once and not repeat code
+        Double forwardIHH;
+        forwardIHH = 0.0;
+        int index = currentBasePair;
+        //update this to an actual function
+        //List<Double> EHH = db.getSomethin(); //SELECT from either human or target WHERE rsid >= rsids.get(row)
+        while (index < upstreamEHH.size()){
+          if (upstreamEHH.get(index) < 0.05){
+            break;  //I don't need to include the <.05 value because it's trapazoidal quadrature- averaging of areas IN BETWEEN points and continuing would put me past the .05 value.
+          }
+          else if ( index == (upstreamEHH.size() - 1) /*hit tail of chromosome*/){
+            forwardIHH = null;
+            break;
+            //find a way to automatically truncate the backward process from here
+          }
+          //account for throwing an error from database?
+          forwardIHH += (upstreamEHH.get(index) + upstreamEHH.get(index + 1)) * getGeneticDistance(index, index + 1)/2;
+          index++;
+        }
+
+        Double backwardIHH;
+        backwardIHH = 0.0;
+        //List<Double> otherEHH = db.getOtherSomethin();
+        index = currentBasePair;
+        while (index != -1 && forwardIHH != null){
+          //'Truncated once ehh < 0.05- but do I need to include the first <.05 value?'
+          if (downstreamEHH.get(index) < 0.05){
+            break;
+          }
+          else if (index == 0/*hit tail of chromosome*/){
+            backwardIHH = null;
+            break;
+          }
+          backwardIHH += (downstreamEHH.get(index) + downstreamEHH.get(index - 1)) * getGeneticDistance(index, index - 1) /2;
+          index--;
+        }
+        Double totalIHH;
+        if (forwardIHH != null && backwardIHH != null) {
+          totalIHH = forwardIHH + backwardIHH;
+        }
+        else {
+          totalIHH = null;
+        }
+        dao.updateDB(dao.STATS, "ihh" + String.valueOf(id), totalIHH, currentBasePair);
+      }
+
+    }
+
+
+    private void calculateUnstandardizedIHS(){
+      List<Double> IHH0 = dao.getStat("ihh0");
+      List<Double> IHH1 = dao.getStat("ihh1");
+      for (int currentBasePair = 0; currentBasePair < IHH0.size(); currentBasePair++){
+        if(IHH0.get(currentBasePair) != null && IHH1.get(currentBasePair) != null){
+          double IHS = Math.log(IHH0.get(currentBasePair)/IHH1.get(currentBasePair));
+          dao.updateDB(dao.STATS, "unstandardizedIHS", IHS, currentBasePair);
+        }
+        else{
+          dao.updateDB(dao.STATS, "unstandardizedIHS", null, currentBasePair);
+        }
+      }
+    }
+
+    private void calculateIHS(){
+      //IF unstandardized is valid / snp is valid or whatever....
+      for (int i = 0; i < DBLength; i++){
+        String freq = dao.getFreq(i);
+        if (dao.freqHasStats(freq) == false) {
+          calculateStandardizationStatistics(freq);
+        }
+        Double mean = dao.getMean(freq);
+        Double standardDeviation = dao.getStandardDeviation(freq);
+        Double unstandardizedIHS = dao.getUnstandardizedIHS(i);
+        Double IHS = (unstandardizedIHS - mean)/standardDeviation;
+        dao.updateDB(dao.STATS, "ihs", IHS, i);
+      }
+      //dao.insert(dao.STANDARDIZATIONSTATS, freq /*!!!!!!*/, String.valueOf(IHS));
+    }
+
+    private void calculateStandardizationStatistics(String freq){
+      List<Double> unstandardizedIHSs = dao.getUnstandardizedIHSvaluesFromSNPFrequency(freq);
+      Double mean = calculateMean(unstandardizedIHSs);
+
+      double squarePower = 2;
+      List<Double> IHSsSquared = new ArrayList<Double>();
+      for (int i = 0; i < unstandardizedIHSs.size() - 1; i++){ //need to take out the -1 once below is fixed
+        //We're not going to be able to handle such a long vector?  FIX!
+        IHSsSquared.add(Math.pow(unstandardizedIHSs.get(i), squarePower)); //Needs to handle a null value
+      }
+      Double meanOfSquares = calculateMean(IHSsSquared);
+      Double standardDeviation = Math.sqrt(meanOfSquares - Math.pow(mean, squarePower));
+      dao.insert(dao.STANDARDIZATIONSTATS,
+        String.valueOf(freq),
+        String.valueOf(mean),
+        String.valueOf(standardDeviation));
+    }
+
+    //In other papers, this is referenced as 'expected value'
+    private Double calculateMean(List<Double> unstandardizedIHSs){
+        Double sum = 0.0;
+        for (int i = 0; i < unstandardizedIHSs.size() - 1; i++){
+          Double temp = unstandardizedIHSs.get(i);
+          //NOT handling null, throws exception -need to fix!!!!
+          if (Double.isFinite(temp) && (temp != null)){
+            sum += temp;
+          }
+        }
+        Double mean = sum / unstandardizedIHSs.size();
+        return mean;
+    }
+
+    //Adjusts for too much space between selected SNPS
+    private float getGeneticDistance(int i, int j){
+      int distance = dao.getBasePairPosition(i) - dao.getBasePairPosition(j);
+      if (Math.abs(distance) > 20){ //Why did I stick 20 in here? From Selscan paper- explain
+        return ((float) 20)/ distance;
+      }
+      return 1;
     }
 }

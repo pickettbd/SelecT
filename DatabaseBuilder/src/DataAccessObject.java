@@ -3,14 +3,14 @@ import java.lang.StringBuilder;
 import java.io.*;
 import java.util.*;
 
+//clean up functions so less repetition!!!!!
 public class DataAccessObject {
     public final static String ALLELES = "alleles";
     public final static String TARGETSNPS = "targetsnps";
     public final static String CROSSSNPS = "crosssnps";
     public final static String HUMANSNPS = "humansnps";
-    public final static String INDIVIDUALS = "individuals";
-    public final static String POPULATIONS = "populations";
-    public final static String STATS = "stats";  //still need to add the last 2 stats
+    public final static String STATS = "stats";
+    public final static String STANDARDIZATIONSTATS = "standardization_stats";
 
     private static List<String> individualIDs;
     private Connection connection;
@@ -51,9 +51,8 @@ public class DataAccessObject {
             stmt.executeUpdate(makeCrossSNPTableCreateStatement());
             stmt.executeUpdate(makeHumanSNPTableCreateStatement());
             stmt.executeUpdate(makeTargetSNPTableCreateStatement());
-            stmt.executeUpdate(makeIndividualTableCreateStatement());
-            stmt.executeUpdate(makePopulationTableCreateStatement());
             stmt.executeUpdate(makeStatsTableCreateStatement());
+            stmt.executeUpdate(makeStandardizationStatsTableCreateStatement());
             stmt.close();
         } catch (Exception e) {
             System.err.println("this happened in CreateTables");
@@ -64,22 +63,77 @@ public class DataAccessObject {
 
     public void insert(String... args) {
         String insert = "";
-        try {
-            if(connection == null)
-                Connect();
+        insert = buildInsertStatement(args);
+        executeUpdate(insert);
+    }
 
-            insert = buildInsertStatement(args);
-            Statement statement = connection.createStatement();
-            statement.executeUpdate(insert);
-            statement.close();
+    public void updateDB(String table, String column, Double value, int row) {
+        String insert = "UPDATE " + table +
+        " SET " + column + " = '" + String.valueOf(value) +
+        "' WHERE rsid = (SELECT rsid FROM alleles WHERE row = '" + String.valueOf(row) + "')";
+        executeUpdate(insert);
+    }
+
+    public boolean freqHasStats(String frequency){
+      String insert = "SELECT COUNT(freq) AS rowcount FROM " + STANDARDIZATIONSTATS + " WHERE freq = '" + frequency + "';";
+      try {
+          if(connection == null)
+              Connect();
+
+          Statement statement = connection.createStatement();
+          //System.out.println(insert);
+          ResultSet rs = statement.executeQuery(insert);
+          int result = rs.getInt("rowcount");
+          statement.close();
+          if (result == 1) {
+            return true;
+          }
+          else
+            return false;
+        } catch (Exception e){
+            System.err.println( e.getClass().getName() + ": " + e.getMessage() );
+            System.out.println(insert);
+            return false; //Is this a valid solution?
+        }
+    }
+
+    public void insertOneValue(String table, String column, String value){
+      String insert = "INSERT INTO " + table +
+      " ( " + column + " ) VALUES ( '" + value + "'); ";
+      executeUpdate(insert);
+    }
+
+    private void executeUpdate(String insert){
+      try {
+          if(connection == null)
+              Connect();
+
+          Statement statement = connection.createStatement();
+          statement.executeUpdate(insert);
+          statement.close();
         } catch (Exception e){
             System.err.println( e.getClass().getName() + ": " + e.getMessage() );
             System.out.println(insert);
         }
     }
 
-    public void update(String... args) {
+    public int getDBLength(){
+      String insert = "SELECT COUNT(row) AS rowcount FROM " + ALLELES;
+      try {
+          if(connection == null)
+              Connect();
 
+          Statement statement = connection.createStatement();
+          //System.out.println(insert);
+          ResultSet rs = statement.executeQuery(insert);
+          int length = rs.getInt("rowcount");
+          statement.close();
+          return length;
+      } catch (Exception e){
+          System.err.println( e.getClass().getName() + ": " + e.getMessage() );
+          System.out.println(insert);
+          return 0;
+      }
     }
 
     //Maybe we can combine this function and the ones above and below since they are similar?
@@ -93,7 +147,6 @@ public class DataAccessObject {
 
           Statement statement = connection.createStatement();
           insert = buildAlleleFrequencyInsertStatement(args);
-          //System.out.println(insert);
           ResultSet rs = statement.executeQuery(insert);
           while (rs.next()) {
             AlleleFrequency af = new AlleleFrequency(rs.getDouble("targetfreq"), rs.getDouble("crossfreq"), rs.getDouble("targetn"), rs.getDouble("crossn"));
@@ -102,6 +155,90 @@ public class DataAccessObject {
           }
           statement.close();
           return list;
+      } catch (Exception e){
+          System.err.println( e.getClass().getName() + ": " + e.getMessage() );
+          System.out.println(insert);
+          return null;
+      }
+    }
+
+    public List<Double> getUnstandardizedIHSvaluesFromSNPFrequency(String freq){
+      String insert = "SELECT unstandardizedIHS FROM " + STATS + " WHERE stats.rsid IN (SELECT rsid FROM humansnps WHERE freq = '" + freq + "');";
+      List<Double> list = new ArrayList<Double>();
+      try {
+          if(connection == null)
+              Connect();
+
+          Statement statement = connection.createStatement();
+          //System.out.println(insert);
+          ResultSet rs = statement.executeQuery(insert);
+          while (rs.next()) {
+            Double unstandardizedIHS = rs.getDouble("unstandardizedIHS");
+            list.add(unstandardizedIHS);
+          }
+          statement.close();
+          return list;
+      } catch (Exception e){
+          System.err.println( e.getClass().getName() + ": " + e.getMessage() );
+          System.out.println(insert);
+          return null;
+      }
+    }
+
+    public String getFreq(int i){
+      String insert = "SELECT freq FROM " + HUMANSNPS + " WHERE rsid = (SELECT rsid FROM alleles WHERE row = '" + String.valueOf(i) + "');";
+      return getAString(insert, "freq");
+    }
+
+    public Double getMean(String freq){ //Rewrite to return a string!!!!!!!
+      String insert = "SELECT mean FROM " + STANDARDIZATIONSTATS + " WHERE freq = '" + freq + "';";
+      return getADouble(insert, "mean");
+    }
+
+    public Double getStandardDeviation(String freq){
+      String insert = "SELECT standardDev FROM " + STANDARDIZATIONSTATS + " WHERE freq = '" + freq + "';";
+      return getADouble(insert, "standardDev");
+    }
+
+    public Double getUnstandardizedIHS(int i){
+      String insert = "SELECT unstandardizedIHS FROM " + STATS + " WHERE rsid = (SELECT rsid FROM alleles WHERE row = '" + String.valueOf(i) + "');";
+      return getADouble(insert, "unstandardizedIHS");
+    }
+
+    private Double getADouble(String insert, String key){
+      try {
+          Double freq = 0.0;
+          if(connection == null)
+              Connect();
+          Statement statement = connection.createStatement();
+          //System.out.println(insert);
+          ResultSet rs = statement.executeQuery(insert);
+          while (rs.next()) {
+            freq = rs.getDouble(key);
+          }
+          statement.close();
+          return freq;
+      } catch (Exception e){
+          System.err.println( e.getClass().getName() + ": " + e.getMessage() );
+          System.out.println(insert);
+          return null;
+      }
+    }
+
+
+    private String getAString(String insert, String key){
+      try {
+          String freq = "";
+          if(connection == null)
+              Connect();
+          Statement statement = connection.createStatement();
+          //System.out.println(insert);
+          ResultSet rs = statement.executeQuery(insert);
+          while (rs.next()) {
+            freq = rs.getString(key);
+          }
+          statement.close();
+          return freq;
       } catch (Exception e){
           System.err.println( e.getClass().getName() + ": " + e.getMessage() );
           System.out.println(insert);
@@ -122,7 +259,7 @@ public class DataAccessObject {
         while (rs.next()){
           rsids.add(rs.getString("rsid"));
         }
-
+        statement.close();
       }
       catch (Exception e){
         e.printStackTrace();
@@ -130,9 +267,33 @@ public class DataAccessObject {
       return rsids;
     }
 
-    public List<Integer> getAlleleRow(String rsid){
+    public List<Double> getStat(String statType){
+      String insert = "SELECT " + statType + " FROM " + STATS + ";";
+      return getListOfDoubles(insert, statType);
+    }
+
+    private List<Double> getListOfDoubles(String insert, String key){
+      List<Double> answers = new ArrayList<>();
+      try{
+        if (connection == null)
+          Connect();
+        Statement statement = connection.createStatement();
+        ResultSet rs = statement.executeQuery(insert);
+
+        while (rs.next()){
+          answers.add(rs.getDouble(key));
+        }
+        statement.close();
+      }
+      catch (Exception e){
+        e.printStackTrace();
+      }
+      return answers;
+    }
+
+    public List<Integer> getAlleleRow(int i){
       //System.out.println(individualIDs.toString());
-      String request = "SELECT * FROM " + ALLELES + " WHERE rsid = '" + rsid + "';";
+      String request = "SELECT * FROM " + ALLELES + " WHERE rsid = (SELECT rsid FROM alleles WHERE row = '" + String.valueOf(i) + "');";
       List<Integer> alleles = new ArrayList<Integer>();
       try{
         if (connection == null)
@@ -140,10 +301,10 @@ public class DataAccessObject {
         Statement statement = connection.createStatement();
         ResultSet rs = statement.executeQuery(request);
 
-        for (int i = 0; i < individualIDs.size(); i++){
-          alleles.add(rs.getInt(individualIDs.get(i)));
+        for (int j = 0; j < individualIDs.size(); j++){
+          alleles.add(rs.getInt(individualIDs.get(j)));
         }
-
+        statement.close();
       }
       catch (Exception e){
         e.printStackTrace();
@@ -164,7 +325,7 @@ public class DataAccessObject {
         while (rs.next()){
           alleles.add(rs.getInt(individualId));
         }
-
+        statement.close();
       }
       catch (Exception e){
         e.printStackTrace();
@@ -185,6 +346,24 @@ public class DataAccessObject {
       } catch (Exception e){
 
       }
+    }
+
+    public int getBasePairPosition(int i){
+      String query = "SELECT pos FROM humansnps h INNER JOIN alleles a ON h.rsid = a.rsid WHERE row = " + String.valueOf(i) + ";";
+      int position = 0;
+      try{
+        if (connection == null)
+          Connect();
+        Statement statement = connection.createStatement();
+        ResultSet rs = statement.executeQuery(query);
+
+        position = rs.getInt("pos");
+        statement.close();
+      }
+      catch (Exception e){
+        e.printStackTrace();
+      }
+      return position;
     }
 
     private String buildInsertStatement(String... args) {
@@ -265,30 +444,28 @@ public class DataAccessObject {
                 //As the program is now, it can only run one/one set of files at a time...
     }
 
-    private String makeIndividualTableCreateStatement() {
-        return "CREATE TABLE IF NOT EXISTS " + INDIVIDUALS +
-                " (individualid TEXT PRIMARY KEY NOT NULL," +
-                " populationid TEXT NOT NULL," +
-                " FOREIGN KEY(populationid) REFERENCES " + POPULATIONS + "(populationid))";
-    }
-
-    private String makePopulationTableCreateStatement() {
-        return "CREATE TABLE IF NOT EXISTS " + POPULATIONS +
-                " (populationid TEXT PRIMARY KEY NOT NULL," +
-                " description TEXT)";
-    }
-
     //perhaps add another table or extend this one to hold intermediate calculations for FST, etc.
     //N so that we can reuse N to calculate D.  Also maybe q.
     private String makeStatsTableCreateStatement(){
       return "CREATE TABLE IF NOT EXISTS " + STATS +
               " (rsid TEXT PRIMARY KEY NOT NULL," +  //I need to find when I update the table to insert this
-              " daf REAL NOT NULL," +
+              " daf REAL," +
               " fst REAL," +
               " ehh0downstream REAL," +
               " ehh0upstream REAL," +
               " ehh1downstream REAL," +
-              " ehh1upstream REAL)";
+              " ehh1upstream REAL," +
+              " ihh0 REAL," +
+              " ihh1 REAL," +
+              " unstandardizedIHS REAL," +
+              " ihs REAL)";
+    }
+
+    private String makeStandardizationStatsTableCreateStatement(){
+      return "CREATE TABLE IF NOT EXISTS " + STANDARDIZATIONSTATS +
+              " (freq REAL," +
+              " mean REAL," +
+              " standardDev REAL)";
     }
 
     private String buildAlleleFrequencyInsertStatement(String... args){
