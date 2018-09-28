@@ -5,12 +5,13 @@ import java.util.*;
 
 //clean up functions so less repetition!!!!!
 public class DataAccessObject {
-    public final static String ALLELES = "alleles";
-    public final static String TARGETSNPS = "targetsnps";
-    public final static String CROSSSNPS = "crosssnps";
-    public final static String HUMANSNPS = "humansnps";
-    public final static String STATS = "stats";
-    public final static String STANDARDIZATIONSTATS = "standardization_stats";
+    public static String TARGETALLELES;
+    public static String CROSSALLELES;
+    public static String TARGETSNPS;
+    public static String CROSSSNPS;
+    public static String STATS;
+    public static String STANDARDIZATIONSTATS;
+    private static String databaseFileName;
 
     private static List<String> individualIDs;
     private Connection connection;
@@ -36,11 +37,41 @@ public class DataAccessObject {
         //Determines location of database in file structure
         //System.out.println(currentDirectory);
 
-        connection = DriverManager.getConnection("jdbc:sqlite:" + currentDirectory + "/DatabaseBuilder/src/db/SELECT.db");
+        connection = DriverManager.getConnection("jdbc:sqlite:" + currentDirectory + "/DatabaseBuilder/src/db/" + databaseFileName + ".db");
         connection.setAutoCommit(false);
     }
 
-    public void CreateTables(List<String> individualIDs) {
+    public static void setDatabaseFileName(String name){
+      databaseFileName = name;
+    }
+
+    public static void setStatsTableName(String name){
+      STATS = name;
+      STANDARDIZATIONSTATS = name + "_standardization_stats";
+    }
+
+    public static void setTargetPopName(String name){
+      TARGETSNPS = name;
+      //TARGETALLELES = name + "_alleles"
+      //WE NEED TO MODIFY SOME STRUCTURE TO HANDLE TWO ALLELES TABLES
+    }
+
+    public static void setCrossPopName(String name){
+      CROSSSNPS = name;
+      //CROSSALLELES = name + "_alleles"
+      //WE NEED TO MODIFY SOME STRUCTURE TO HANDLE TWO ALLELES TABLES
+    }
+
+    public static void setCrossAllelesName(String name){
+      CROSSALLELES = name;
+    }
+
+    public static void setTargetAllelesName(String name){
+      TARGETALLELES = name;
+    }
+
+
+    public void CreateInputTables(List<String> individualIDs) {
       //System.out.println("createTables called");
         try {
             if(connection == null)
@@ -48,17 +79,27 @@ public class DataAccessObject {
 
             Statement stmt = connection.createStatement();
             stmt.executeUpdate(makeAlleleTableCreateStatement(individualIDs));
-            stmt.executeUpdate(makeCrossSNPTableCreateStatement());
-            stmt.executeUpdate(makeHumanSNPTableCreateStatement());
             stmt.executeUpdate(makeTargetSNPTableCreateStatement());
-            stmt.executeUpdate(makeStatsTableCreateStatement());
-            stmt.executeUpdate(makeStandardizationStatsTableCreateStatement());
             stmt.close();
         } catch (Exception e) {
-            System.err.println("this happened in CreateTables");
             System.err.println( e.getClass().getName() + ": " + e.getMessage() );
             e.printStackTrace();
         }
+    }
+
+    public void CreateStatTables(){
+      try {
+          if(connection == null)
+              Connect();
+
+          Statement stmt = connection.createStatement();
+          stmt.executeUpdate(makeStatsTableCreateStatement());
+          stmt.executeUpdate(makeStandardizationStatsTableCreateStatement());
+          stmt.close();
+      } catch (Exception e) {
+          System.err.println( e.getClass().getName() + ": " + e.getMessage() );
+          e.printStackTrace();
+      }
     }
 
     public void insert(String... args) {
@@ -118,7 +159,7 @@ public class DataAccessObject {
     }
 
     public int getDBLength(){
-      String insert = "SELECT COUNT(row) AS rowcount FROM " + ALLELES;
+      String insert = "SELECT COUNT(rsid) AS rowcount FROM " + TARGETSNPS;
       try {
           if(connection == null)
               Connect();
@@ -186,7 +227,7 @@ public class DataAccessObject {
     }
 
     public String getFreq(int i){
-      String insert = "SELECT freq FROM " + HUMANSNPS + " WHERE rsid = (SELECT rsid FROM alleles WHERE row = '" + String.valueOf(i) + "');";
+      String insert = "SELECT freq FROM " + TARGETSNPS + " WHERE rsid = (SELECT rsid FROM alleles WHERE row = '" + String.valueOf(i) + "');";
       return getAString(insert, "freq");
     }
 
@@ -291,9 +332,9 @@ public class DataAccessObject {
       return answers;
     }
 
-    public List<Integer> getAlleleRow(int i){
+    public List<Integer> getAlleleRow(int i, String alleleTableName){
       //System.out.println(individualIDs.toString());
-      String request = "SELECT * FROM " + ALLELES + " WHERE rsid = (SELECT rsid FROM alleles WHERE row = '" + String.valueOf(i) + "');";
+      String request = "SELECT * FROM " + alleleTableName + " WHERE rsid = (SELECT rsid FROM " + alleleTableName + " WHERE row = '" + String.valueOf(i) + "');";
       List<Integer> alleles = new ArrayList<Integer>();
       try{
         if (connection == null)
@@ -312,8 +353,8 @@ public class DataAccessObject {
       return alleles;
     }
 
-    public List<Integer> getAlleleColumn(String individualId, String whereClause){
-      String request = "SELECT " + individualId + " FROM " + ALLELES + " " + whereClause + ";";
+    public List<Integer> getAlleleColumn(String individualId, String whereClause, String alleleTableName){
+      String request = "SELECT " + individualId + " FROM " + alleleTableName + " " + whereClause + ";";
       //System.out.println(request);
       List<Integer> alleles = new ArrayList<Integer>();
       try{
@@ -385,7 +426,7 @@ public class DataAccessObject {
     private String makeAlleleTableCreateStatement(List<String> individualIDs) {
         StringBuilder sb = new StringBuilder();
         this.individualIDs = new ArrayList<String>();
-        sb.append("CREATE TABLE IF NOT EXISTS " + ALLELES +
+        sb.append("CREATE TABLE IF NOT EXISTS " + TARGETALLELES +
                 " (row INTEGER PRIMARY KEY," +
                 " rsid TEXT NOT NULL" );
                 for (String id : individualIDs) {
@@ -412,14 +453,17 @@ public class DataAccessObject {
 
     //We need to make sure that data storage types will not introduce roundoff error!
     private String makeTargetSNPTableCreateStatement() {
-        return "CREATE TABLE IF NOT EXISTS " + TARGETSNPS +
+        String insert =  "CREATE TABLE IF NOT EXISTS " + TARGETSNPS +
                 " (rsid TEXT PRIMARY KEY NOT NULL," +
                 " chr INT NOT NULL," +
                 " pos INT NOT NULL," +
-                " targetfreq REAL NOT NULL," +
-                " targetn REAL NOT NULL)"; //number of alleles sampled
+                " freq REAL NOT NULL," +
+                " n REAL NOT NULL)";
+        System.out.println(insert);
+        return insert;//number of alleles sampled
     }
 
+/*
     private String makeCrossSNPTableCreateStatement() {
         return "CREATE TABLE IF NOT EXISTS " + CROSSSNPS +
                 " (rsid TEXT PRIMARY KEY NOT NULL," +
@@ -428,8 +472,8 @@ public class DataAccessObject {
                 " crossfreq REAL NOT NULL," +
                 " crossn REAL NOT NULL)"; //number of alleles sampled
     }
-
-    private String makeHumanSNPTableCreateStatement() {
+*/
+/*    private String makeHumanSNPTableCreateStatement() {
         return "CREATE TABLE IF NOT EXISTS " + HUMANSNPS +
                 " (rsid TEXT PRIMARY KEY NOT NULL," +
                 " chr INT NOT NULL," +
@@ -442,7 +486,7 @@ public class DataAccessObject {
                 //This table only handles one human file; do we need to inclue the ID
                 //so we can potentially run multiple human files?
                 //As the program is now, it can only run one/one set of files at a time...
-    }
+    }  */
 
     //perhaps add another table or extend this one to hold intermediate calculations for FST, etc.
     //N so that we can reuse N to calculate D.  Also maybe q.
@@ -458,7 +502,8 @@ public class DataAccessObject {
               " ihh0 REAL," +
               " ihh1 REAL," +
               " unstandardizedIHS REAL," +
-              " ihs REAL)";
+              " ihs REAL," +
+              " xpehh REAL)";
     }
 
     private String makeStandardizationStatsTableCreateStatement(){

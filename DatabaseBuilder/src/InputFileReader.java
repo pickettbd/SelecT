@@ -4,21 +4,23 @@ import java.util.*;
 class InputFileReader {
 
     private DataAccessObject dao;
+    private BufferedReader in;
 
     public InputFileReader(DataAccessObject dao){
         this.dao = dao;
     }
 
-    public boolean readFile(String filename, String popid, String popDescription) throws IOException {
+    public boolean readFile(InputTask task) throws IOException {
         //Prepare reader
         FileReader fileReader;
 	      try {
-	          String workingDirectory = System.getProperty("user.dir") + "/DatabaseBuilder/test/";
-            fileReader = new FileReader(workingDirectory + filename);
-	      } catch (FileNotFoundException e) {
+	          String workingDirectory = System.getProperty("user.dir") + "/DatabaseBuilder/test/"; //consider taking input so they can put their file wherever
+            fileReader = new FileReader(workingDirectory + task.getFilename());
+	      } catch (FileNotFoundException e) { //Consider throwing this to DatabaseBuilder !!
             return false;
         }
-        BufferedReader buffReader = new BufferedReader(fileReader);
+
+        in = new BufferedReader(fileReader);
 
         String line;
         List<String> individualIDs = new ArrayList<>();
@@ -27,14 +29,9 @@ class InputFileReader {
         String targetPopulation = "";
         String crossPopulation = "";
 
-        if (popDescription.equals("human")) {
-          targetPopulation = UserInterface.getTargetPopulation();
-          crossPopulation = UserInterface.getCrossPopulation();
-        }
-
         //Read in lines of .vcf files.
         int lineNumber = 0;
-        while ((line = buffReader.readLine()) != null){
+        while ((line = in.readLine()) != null){
             if(line.charAt(0) == '#') {
                 //Ignore ## header lines. Single # line contains column headings
                 if(line.charAt(1) != '#'){
@@ -44,7 +41,7 @@ class InputFileReader {
                         //dao.insert(dao.INDIVIDUALS, parts[i], popid);
                         individualIDs.add(parts[i]);
                     }
-                    dao.CreateTables(individualIDs);
+                    dao.CreateInputTables(individualIDs);
                 }
                 continue;
             }
@@ -79,7 +76,7 @@ class InputFileReader {
             String freq = "";
             String n = "";
             for (String infoPart : info) {
-                if(infoPart.startsWith("AF=")) {
+                if(infoPart.startsWith(task.getColumnToRead() + "=")) {
                     freq = infoPart.substring(3);
                     //System.out.println("freq = " + freq);
                 }
@@ -89,60 +86,28 @@ class InputFileReader {
                 }
             }
 
-            //This handles insertion for a typical species' vcf file (the end goal for the program)
-            //We need to have two different tables, one for each file, not just SNPS
-            if (popDescription.equals("target")) {
-              dao.insert(dao.TARGETSNPS, id, chrom, pos, freq, n);
-              //System.out.println("target entered");
+            dao.insert(dao.TARGETSNPS, id, chrom, pos, freq, n);
 
-            }
-
-            else if (popDescription.equals("cross")) {
-              dao.insert(dao.CROSSSNPS, id, chrom, pos, freq, n);
-              //System.out.println("cross entered");
-
-            }
-
-            //in the case of a single human file where we need two additional columns
-            else {
-              //Get frequency of target and cross populations from INFO column
-              //System.out.println("popDescription is " + popDescription);
-              String target = "";
-              for (String infoPart : info) {
-                  if(infoPart.startsWith(targetPopulation)) {
-                      target = infoPart.substring(8);
-                      //System.out.println("freq = " + freq);
-                      break;
-                  }
-              }
-              String cross = "";
-              for (String infoPart : info) {
-                  if(infoPart.startsWith(crossPopulation)) {
-                      cross = infoPart.substring(8);
-                      //System.out.println("freq = " + freq);
-                      break;
-                  }
-              }
-
-              //We need to create a different table for humans that has two more rows
-              dao.insert(dao.HUMANSNPS, id, chrom, pos, freq, target, cross, n, n);
-              dao.insertOneValue(dao.STATS, "rsid", id);
-            }
+            //dao.insertOneValue(dao.STATS, "rsid", id);!!!!!!!!!!!  We need to find a workaround for this!!!!!!!
 
             //Iterate through individuals and store each of their alleles into allele table
-            String[] finalAlleles = new String[2*individualIDs.size() + 3];
-            int j = 0;
-            finalAlleles[j++] = dao.ALLELES;
-            finalAlleles[j++] = String.valueOf(lineNumber);
-            finalAlleles[j++] = id;
-            for(int i = 9; i < parts.length; i++){
-                String[] alleles = parts[i].split("|");
-                finalAlleles[j++] = alleles[0];
-                finalAlleles[j++] = alleles[2];
-                //dao.insert(dao.ALLELES, id, individualIDs.get(i-9), "0", alleles[0]);
-                //dao.insert(dao.ALLELES, id, individualIDs.get(i-9), "1", alleles[2]);
+            if (task.getMakeAlleleTable()){
+              String[] finalAlleles = new String[2*individualIDs.size() + 3];
+              int j = 0;
+              finalAlleles[j++] = dao.TARGETALLELES;
+              finalAlleles[j++] = String.valueOf(lineNumber);
+              finalAlleles[j++] = id;
+              for(int i = 9; i < parts.length; i++){
+                  String[] alleles = parts[i].split("|");
+                  finalAlleles[j++] = alleles[0];
+                  finalAlleles[j++] = alleles[2];
+                  //dao.insert(dao.ALLELES, id, individualIDs.get(i-9), "0", alleles[0]);
+                  //dao.insert(dao.ALLELES, id, individualIDs.get(i-9), "1", alleles[2]);
+              }
+              dao.insert(finalAlleles);
             }
-            dao.insert(finalAlleles);
+
+
             lineNumber++;
         }
         return true;

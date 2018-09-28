@@ -15,40 +15,44 @@ public class PopulationStats {
       DBLength = dao.getDBLength();
     }
 
-    //clean it up- put the database calls either entirely in this function or not at all
-    public void calculateStats(int numberOfFiles){
-      //System.out.println("calculate stats called" + numberOfFiles);
-      calculateDAFandFST(numberOfFiles);
-      dao.commit();  //is there anything we need to check for before committing?
-      calculateEHH();
-      dao.commit();
-      calculateIHH();
-      dao.commit();
-      calculateUnstandardizedIHS();
-      dao.commit();
-      calculateIHS();
-      dao.commit();
-      dao.close();
-
-      System.out.println("statistics calculated! Please view them in the database.");
+    //impelement a 'has been calculated' funciton in DB so that if user picks ihh, ehh will be handled, too, etc.
+    public void calculateStats(String statToCalculate){
+      //System.out.println("calculate stats called");
+      switch (statToCalculate) {
+          case "dDAF":
+              calculateDAFandFST();
+              break;
+          case "FST":
+              calculateDAFandFST();
+              break;
+          case "EHH":
+              calculateEHH();
+              break;
+          case "IHH":
+              calculateIHH();
+              break;
+          case "IHS":
+              calculateIHS();
+              break;
+          case "XPEHH":
+              calculateXPEHH();
+              break;
+          default:
+              System.out.println("Invalid selection. Please try again.");
+        }
     }
 
-    private List<AlleleFrequency> getAlleleFrequency(int numberOfFiles){
-      if (numberOfFiles == 1) {
-        return dao.getAlleleFrequency("targetfreq", "crossfreq", "targetn", "crossn", dao.HUMANSNPS);
-      }
-      else {
-        return dao.getAlleleFrequency("targetfreq", "targetn", "crossfreq", "crossn", dao.TARGETSNPS, dao.CROSSSNPS);
-        //I need to modify this to not have copycat code
-      }
+    private List<AlleleFrequency> getAlleleFrequency(){
+      return dao.getAlleleFrequency("freq", "n", "freq", "n", dao.TARGETSNPS, dao.CROSSSNPS);
     }
 
 
 //check if a double really is the best way of maintaining decimal precision!
 //rename calculateFreqBasedStats?
 //Should DAF be in absolute value?
-    private void calculateDAFandFST(int numberOfFiles) {
-      List<AlleleFrequency> AF = getAlleleFrequency(numberOfFiles); //Combine this with DAF above for less space & database calls
+//Separate DAF and FST so that user can pick to do one or the other
+    private void calculateDAFandFST() {
+      List<AlleleFrequency> AF = getAlleleFrequency(); //Combine this with DAF above for less space & database calls
       for (int i = 0; i < DBLength; i++) {
         double target = AF.get(i).getTargetFreq();
         double cross = AF.get(i).getCrossFreq();
@@ -76,6 +80,7 @@ public class PopulationStats {
         dao.updateDB(dao.STATS, "daf", target - cross, i);
         dao.updateDB(dao.STATS, "fst", fst, i);
       }
+      dao.commit();   //is there anything we need to check for before committing?
     }
 
 
@@ -116,15 +121,13 @@ public class PopulationStats {
 
      (note: we will also need to calculate upstream EHH to calculate iHH)
 
-
-     **Pseudocode:**
     */
     private void calculateEHH() {
 
          List<String> individualIDs = dao.getIndividualIDs();
          //System.out.println(individualIDs.toString());
          for(int row = 0; row < DBLength; row++) {
-            List<Integer> alleles = dao.getAlleleRow(row);
+            List<Integer> alleles = dao.getAlleleRow(row, DataAccessObject.TARGETALLELES); //Modify this to handle variable for XPEHH!!!!!!!
             List<Integer> list0 = new ArrayList<>();
             List<Integer> list1 = new ArrayList<>();
 
@@ -144,6 +147,7 @@ public class PopulationStats {
             calculateDownstreamAndUpstreamEHH(individualIDs, list0, row, 0);
             calculateDownstreamAndUpstreamEHH(individualIDs, list1, row, 1);
          }
+         dao.commit();
     }
 
 //break down bottom function into these three?
@@ -168,10 +172,10 @@ public class PopulationStats {
       //System.out.println("rsid index: " + row);
 
       for(int individual : alleleLocations) {
-        //Add the option for the user to include a window size?
-          List<Integer> downstreamSNPs = dao.getAlleleColumn(individualIDs.get(individual), "WHERE row > " + String.valueOf(row));
+        //Add the option for the user to include a window size!!!!!!
+          List<Integer> downstreamSNPs = dao.getAlleleColumn(individualIDs.get(individual), "WHERE row > " + String.valueOf(row), DataAccessObject.TARGETALLELES); //Modify this to handle variable for XPEHH!!!!!!!
           //System.out.println("downstream SNPS: " + downstreamSNPs.toString());
-          List<Integer> upstreamSNPs = dao.getAlleleColumn(individualIDs.get(individual), "WHERE row < " + String.valueOf(row)); //ORDER BY rsid DESC
+          List<Integer> upstreamSNPs = dao.getAlleleColumn(individualIDs.get(individual), "WHERE row < " + String.valueOf(row), DataAccessObject.TARGETALLELES); //Modify this to handle variable for XPEHH!!!!!!!
               // note: in the final implementation, this will need to be limited to the next and previous million SNPs, respectively.
               // see supporting online material for "A Composite of Multiple Signals" which indicates 1MB before and after the SNP of interest.
           StringBuilder downstreamHaplotype = new StringBuilder();
@@ -225,6 +229,7 @@ public class PopulationStats {
       List<Double> EHH1upstream = dao.getStat("ehh1upstream");
       calculateIHH(EHH0downstream, EHH0upstream, 0);
       calculateIHH(EHH1downstream, EHH1upstream, 1);
+      dao.commit();
     }
 
 
@@ -292,6 +297,7 @@ public class PopulationStats {
           dao.updateDB(dao.STATS, "unstandardizedIHS", null, currentBasePair);
         }
       }
+      dao.commit();
     }
 
     private void calculateIHS(){
@@ -307,7 +313,12 @@ public class PopulationStats {
         Double IHS = (unstandardizedIHS - mean)/standardDeviation;
         dao.updateDB(dao.STATS, "ihs", IHS, i);
       }
+      dao.commit();
       //dao.insert(dao.STANDARDIZATIONSTATS, freq /*!!!!!!*/, String.valueOf(IHS));
+    }
+
+    private void calculateXPEHH(){
+      //FINISH THIS METHOD!!
     }
 
     private void calculateStandardizationStatistics(String freq){
@@ -326,6 +337,7 @@ public class PopulationStats {
         String.valueOf(freq),
         String.valueOf(mean),
         String.valueOf(standardDeviation));
+      dao.commit();
     }
 
     //In other papers, this is referenced as 'expected value'
