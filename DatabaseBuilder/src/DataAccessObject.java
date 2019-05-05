@@ -52,13 +52,13 @@ public class DataAccessObject {
 
     public static void setTargetPopName(String name){
       TARGETSNPS = name;
-      //TARGETALLELES = name + "_alleles"
+      //TARGETALLELES = name + "_alleles";
       //WE NEED TO MODIFY SOME STRUCTURE TO HANDLE TWO ALLELES TABLES
     }
 
     public static void setCrossPopName(String name){
       CROSSSNPS = name;
-      //CROSSALLELES = name + "_alleles"
+      //CROSSALLELES = name + "_alleles";
       //WE NEED TO MODIFY SOME STRUCTURE TO HANDLE TWO ALLELES TABLES
     }
 
@@ -71,14 +71,16 @@ public class DataAccessObject {
     }
 
 
-    public void CreateInputTables(List<String> individualIDs) {
+    public void createInputTables(List<String> individualIDs, boolean makeAlleleTable) {
       //System.out.println("createTables called");
         try {
             if(connection == null)
                 Connect();
 
             Statement stmt = connection.createStatement();
-            stmt.executeUpdate(makeAlleleTableCreateStatement(individualIDs));
+            if (makeAlleleTable) {
+              stmt.executeUpdate(makeAlleleTableCreateStatement(individualIDs));
+            }
             stmt.executeUpdate(makeTargetSNPTableCreateStatement());
             stmt.close();
         } catch (Exception e) {
@@ -87,13 +89,14 @@ public class DataAccessObject {
         }
     }
 
-    public void CreateStatTables(){
+    public void createStatTables(){
       try {
           if(connection == null)
               Connect();
 
           Statement stmt = connection.createStatement();
           stmt.executeUpdate(makeStatsTableCreateStatement());
+          insertStatsRsids();
           stmt.executeUpdate(makeStandardizationStatsTableCreateStatement());
           stmt.close();
       } catch (Exception e) {
@@ -111,12 +114,26 @@ public class DataAccessObject {
     public void updateDB(String table, String column, Double value, int row) {
         String insert = "UPDATE " + table +
         " SET " + column + " = '" + String.valueOf(value) +
-        "' WHERE rsid = (SELECT rsid FROM alleles WHERE row = '" + String.valueOf(row) + "')";
+        "' WHERE rsid = (SELECT rsid from " + TARGETSNPS + " WHERE row = '" + String.valueOf(row) + "')";
         executeUpdate(insert);
+    }
+
+    private void insertStatsRsids(){
+      String insert = "INSERT INTO " + STATS + " (rsid) SELECT rsid FROM " + TARGETSNPS;
+      executeUpdate(insert);
+    }
+
+    public boolean statsWereCaluclated(String stat){
+      String insert = "SELECT COUNT(" + stat + ") AS rowcount FROM " + STATS + " WHERE " + stat + " != null";
+      return getCount(insert);
     }
 
     public boolean freqHasStats(String frequency){
       String insert = "SELECT COUNT(freq) AS rowcount FROM " + STANDARDIZATIONSTATS + " WHERE freq = '" + frequency + "';";
+      return getCount(insert);
+    }
+
+    private boolean getCount(String insert){
       try {
           if(connection == null)
               Connect();
@@ -126,11 +143,11 @@ public class DataAccessObject {
           ResultSet rs = statement.executeQuery(insert);
           int result = rs.getInt("rowcount");
           statement.close();
-          if (result == 1) {
-            return true;
+          if (result == 0) {
+            return false;
           }
           else
-            return false;
+            return true;
         } catch (Exception e){
             System.err.println( e.getClass().getName() + ": " + e.getMessage() );
             System.out.println(insert);
@@ -179,15 +196,15 @@ public class DataAccessObject {
 
     //Maybe we can combine this function and the ones above and below since they are similar?
     //add some keyword for which function to call for the value of insert
-    public List<AlleleFrequency> getAlleleFrequency(String... args){
-      String insert = "";
+    public List<AlleleFrequency> getAlleleFrequency(){
+      String insert = "SELECT " + TARGETSNPS + ".freq AS targetfreq, " + TARGETSNPS + ".n AS targetn, " + CROSSSNPS + ".freq AS crossfreq, " + CROSSSNPS + ".n AS crossn " + "FROM " + TARGETSNPS + ", " + CROSSSNPS + " WHERE " + TARGETSNPS + ".rsid = " + CROSSSNPS +  ".rsid";
       List<AlleleFrequency> list = new ArrayList<AlleleFrequency>();
       try {
           if(connection == null)
               Connect();
 
           Statement statement = connection.createStatement();
-          insert = buildAlleleFrequencyInsertStatement(args);
+          //insert = buildAlleleFrequencyInsertStatement(args);
           ResultSet rs = statement.executeQuery(insert);
           while (rs.next()) {
             AlleleFrequency af = new AlleleFrequency(rs.getDouble("targetfreq"), rs.getDouble("crossfreq"), rs.getDouble("targetn"), rs.getDouble("crossn"));
@@ -204,7 +221,7 @@ public class DataAccessObject {
     }
 
     public List<Double> getUnstandardizedIHSvaluesFromSNPFrequency(String freq){
-      String insert = "SELECT unstandardizedIHS FROM " + STATS + " WHERE stats.rsid IN (SELECT rsid FROM humansnps WHERE freq = '" + freq + "');";
+      String insert = "SELECT unstandardizedIHS FROM " + STATS + " WHERE " + STATS + ".rsid IN (SELECT rsid FROM " + TARGETSNPS + " WHERE freq = '" + freq + "');";
       List<Double> list = new ArrayList<Double>();
       try {
           if(connection == null)
@@ -227,7 +244,7 @@ public class DataAccessObject {
     }
 
     public String getFreq(int i){
-      String insert = "SELECT freq FROM " + TARGETSNPS + " WHERE rsid = (SELECT rsid FROM alleles WHERE row = '" + String.valueOf(i) + "');";
+      String insert = "SELECT freq FROM " + TARGETSNPS + " WHERE row = '" + String.valueOf(i) + "';";
       return getAString(insert, "freq");
     }
 
@@ -242,7 +259,7 @@ public class DataAccessObject {
     }
 
     public Double getUnstandardizedIHS(int i){
-      String insert = "SELECT unstandardizedIHS FROM " + STATS + " WHERE rsid = (SELECT rsid FROM alleles WHERE row = '" + String.valueOf(i) + "');";
+      String insert = "SELECT unstandardizedIHS FROM " + STATS + " WHERE rsid = (SELECT rsid FROM " + TARGETSNPS + " WHERE row = '" + String.valueOf(i) + "');";
       return getADouble(insert, "unstandardizedIHS");
     }
 
@@ -288,7 +305,7 @@ public class DataAccessObject {
     }
 
     public List<String> getRSIDs(){
-      String request = "SELECT rsid FROM alleles";
+      String request = "SELECT rsid FROM " + TARGETSNPS;
       //is this the most efficient list type?
       List<String> rsids = new ArrayList<String>();
       try{
@@ -334,7 +351,8 @@ public class DataAccessObject {
 
     public List<Integer> getAlleleRow(int i, String alleleTableName){
       //System.out.println(individualIDs.toString());
-      String request = "SELECT * FROM " + alleleTableName + " WHERE rsid = (SELECT rsid FROM " + alleleTableName + " WHERE row = '" + String.valueOf(i) + "');";
+      String request = "SELECT * FROM " + alleleTableName + " WHERE row = '" + String.valueOf(i) + "';";
+      //System.out.println(request);
       List<Integer> alleles = new ArrayList<Integer>();
       try{
         if (connection == null)
@@ -390,7 +408,7 @@ public class DataAccessObject {
     }
 
     public int getBasePairPosition(int i){
-      String query = "SELECT pos FROM humansnps h INNER JOIN alleles a ON h.rsid = a.rsid WHERE row = " + String.valueOf(i) + ";";
+      String query = "SELECT pos FROM " + TARGETSNPS + " h INNER JOIN " + TARGETALLELES + " a ON h.rsid = a.rsid WHERE a.row = " + String.valueOf(i) + ";";
       int position = 0;
       try{
         if (connection == null)
@@ -436,14 +454,6 @@ public class DataAccessObject {
                   this.individualIDs.add(id + "allele2");
                 }
                 sb.append(");");
-                //" FOREIGN KEY(rsid) REFERENCES " + HUMANSNPS + "(rsid));";
-                //HUMANSNPS was used so that the program will compile, but we need to look
-                //at which table should actually be referenced here.  We may
-                //need two allele tables depending if we are working with humans or not
-                //System.out.println("allele create table statement:");
-                //System.out.println(sb.toString());
-                //System.out.println(individualIDs);
-                //System.out.println(this.individualIDs);
                 return sb.toString();
     }
 
@@ -453,46 +463,22 @@ public class DataAccessObject {
 
     //We need to make sure that data storage types will not introduce roundoff error!
     private String makeTargetSNPTableCreateStatement() {
-        String insert =  "CREATE TABLE IF NOT EXISTS " + TARGETSNPS +
-                " (rsid TEXT PRIMARY KEY NOT NULL," +
+        return  "CREATE TABLE IF NOT EXISTS " + TARGETSNPS +
+                " (row INTEGER PRIMARY KEY," +
+                " rsid TEXT NOT NULL," +
                 " chr INT NOT NULL," +
                 " pos INT NOT NULL," +
                 " freq REAL NOT NULL," +
                 " n REAL NOT NULL)";
-        System.out.println(insert);
-        return insert;//number of alleles sampled
     }
 
-/*
-    private String makeCrossSNPTableCreateStatement() {
-        return "CREATE TABLE IF NOT EXISTS " + CROSSSNPS +
-                " (rsid TEXT PRIMARY KEY NOT NULL," +
-                " chr INT NOT NULL," +
-                " pos INT NOT NULL," +
-                " crossfreq REAL NOT NULL," +
-                " crossn REAL NOT NULL)"; //number of alleles sampled
-    }
-*/
-/*    private String makeHumanSNPTableCreateStatement() {
-        return "CREATE TABLE IF NOT EXISTS " + HUMANSNPS +
-                " (rsid TEXT PRIMARY KEY NOT NULL," +
-                " chr INT NOT NULL," +
-                " pos INT NOT NULL," +
-                " freq REAL NOT NULL," + //total frequency of all individuals sampled
-                " targetfreq REAL NOT NULL," + //freq of target subpopulation
-                " crossfreq REAL NOT NULL," + //freq of cross subpopulation
-                " targetn REAL NOT NULL," + //number of target alleles sampled
-                " crossn REAL NOT NULL)"; //number of cross alleles sampled
-                //This table only handles one human file; do we need to inclue the ID
-                //so we can potentially run multiple human files?
-                //As the program is now, it can only run one/one set of files at a time...
-    }  */
 
     //perhaps add another table or extend this one to hold intermediate calculations for FST, etc.
     //N so that we can reuse N to calculate D.  Also maybe q.
     private String makeStatsTableCreateStatement(){
       return "CREATE TABLE IF NOT EXISTS " + STATS +
-              " (rsid TEXT PRIMARY KEY NOT NULL," +  //I need to find when I update the table to insert this
+              " (row INTEGER PRIMARY KEY," +
+              " rsid TEXT NOT NULL," +  //I need to find when I update the table to insert this
               " daf REAL," +
               " fst REAL," +
               " ehh0downstream REAL," +
@@ -513,7 +499,8 @@ public class DataAccessObject {
               " standardDev REAL)";
     }
 
-    private String buildAlleleFrequencyInsertStatement(String... args){
+/*
+    private String buildAlleleFrequencyInsertStatement(){
       String SQL = new String("SELECT " + args[0]);
       for (int i = 1; i < 4; i++) {
         SQL = SQL + ", " + args[i];
@@ -526,5 +513,6 @@ public class DataAccessObject {
       //System.out.println("insert = " + SQL);
       return SQL;
     }
+    */
 
 }

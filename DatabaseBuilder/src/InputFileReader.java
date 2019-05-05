@@ -16,7 +16,7 @@ class InputFileReader {
 	      try {
 	          String workingDirectory = System.getProperty("user.dir") + "/DatabaseBuilder/test/"; //consider taking input so they can put their file wherever
             fileReader = new FileReader(workingDirectory + task.getFilename());
-	      } catch (FileNotFoundException e) { //Consider throwing this to DatabaseBuilder !!
+	      } catch (FileNotFoundException e) { //Consider throwing this to DatabaseBuilder?
             return false;
         }
 
@@ -41,7 +41,7 @@ class InputFileReader {
                         //dao.insert(dao.INDIVIDUALS, parts[i], popid);
                         individualIDs.add(parts[i]);
                     }
-                    dao.CreateInputTables(individualIDs);
+                    dao.createInputTables(individualIDs, task.getMakeAlleleTable());
                 }
                 continue;
             }
@@ -86,7 +86,7 @@ class InputFileReader {
                 }
             }
 
-            dao.insert(dao.TARGETSNPS, id, chrom, pos, freq, n);
+            dao.insert(dao.TARGETSNPS, String.valueOf(lineNumber), id, chrom, pos, freq, n);
 
             //dao.insertOneValue(dao.STATS, "rsid", id);!!!!!!!!!!!  We need to find a workaround for this!!!!!!!
 

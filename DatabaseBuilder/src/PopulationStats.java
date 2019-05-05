@@ -36,14 +36,14 @@ public class PopulationStats {
               break;
           case "XPEHH":
               calculateXPEHH();
-              break;
+              break;  // Add case "all" !!!!
           default:
               System.out.println("Invalid selection. Please try again.");
         }
     }
 
     private List<AlleleFrequency> getAlleleFrequency(){
-      return dao.getAlleleFrequency("freq", "n", "freq", "n", dao.TARGETSNPS, dao.CROSSSNPS);
+      return dao.getAlleleFrequency();
     }
 
 
@@ -51,8 +51,9 @@ public class PopulationStats {
 //rename calculateFreqBasedStats?
 //Should DAF be in absolute value?
 //Separate DAF and FST so that user can pick to do one or the other
+//ORIGINALLY Combined this with DAF above for less space & database calls
     private void calculateDAFandFST() {
-      List<AlleleFrequency> AF = getAlleleFrequency(); //Combine this with DAF above for less space & database calls
+      List<AlleleFrequency> AF = getAlleleFrequency();
       for (int i = 0; i < DBLength; i++) {
         double target = AF.get(i).getTargetFreq();
         double cross = AF.get(i).getCrossFreq();
@@ -173,9 +174,9 @@ public class PopulationStats {
 
       for(int individual : alleleLocations) {
         //Add the option for the user to include a window size!!!!!!
-          List<Integer> downstreamSNPs = dao.getAlleleColumn(individualIDs.get(individual), "WHERE row > " + String.valueOf(row), DataAccessObject.TARGETALLELES); //Modify this to handle variable for XPEHH!!!!!!!
+          List<Integer> downstreamSNPs = dao.getAlleleColumn(individualIDs.get(individual), "WHERE row > " + String.valueOf(row) + " AND row < " + String.valueOf(row + 200), DataAccessObject.TARGETALLELES); //Modify this to handle variable for XPEHH!!!!!!!
           //System.out.println("downstream SNPS: " + downstreamSNPs.toString());
-          List<Integer> upstreamSNPs = dao.getAlleleColumn(individualIDs.get(individual), "WHERE row < " + String.valueOf(row), DataAccessObject.TARGETALLELES); //Modify this to handle variable for XPEHH!!!!!!!
+          List<Integer> upstreamSNPs = dao.getAlleleColumn(individualIDs.get(individual), "WHERE row < " + String.valueOf(row) + " AND row > " + String.valueOf(row - 200), DataAccessObject.TARGETALLELES); //Modify this to handle variable for XPEHH!!!!!!!
               // note: in the final implementation, this will need to be limited to the next and previous million SNPs, respectively.
               // see supporting online material for "A Composite of Multiple Signals" which indicates 1MB before and after the SNP of interest.
           StringBuilder downstreamHaplotype = new StringBuilder();
@@ -223,6 +224,9 @@ public class PopulationStats {
 //Loop through to do ehh0 AND ehh1 - right now this is only doing one or the other based on what is returned from the database
 //Find a way to make it stop at tails of chromosomes
     private void calculateIHH(){
+      if (!dao.statsWereCaluclated("ehh0downstream")) {
+        calculateEHH();
+      }
       List<Double> EHH0downstream = dao.getStat("ehh0downstream");
       List<Double> EHH0upstream = dao.getStat("ehh0upstream");
       List<Double> EHH1downstream = dao.getStat("ehh1downstream");
@@ -286,6 +290,9 @@ public class PopulationStats {
 
 
     private void calculateUnstandardizedIHS(){
+      if (!dao.statsWereCaluclated("ihh0")) {
+        calculateIHH();
+      }
       List<Double> IHH0 = dao.getStat("ihh0");
       List<Double> IHH1 = dao.getStat("ihh1");
       for (int currentBasePair = 0; currentBasePair < IHH0.size(); currentBasePair++){
@@ -301,6 +308,7 @@ public class PopulationStats {
     }
 
     private void calculateIHS(){
+      calculateUnstandardizedIHS();
       //IF unstandardized is valid / snp is valid or whatever....
       for (int i = 0; i < DBLength; i++){
         String freq = dao.getFreq(i);
@@ -318,6 +326,9 @@ public class PopulationStats {
     }
 
     private void calculateXPEHH(){
+      if (dao.statsWereCaluclated("FIGURE OUT WHAT TO CHECK!!")) {
+
+      }
       //FINISH THIS METHOD!!
     }
 
